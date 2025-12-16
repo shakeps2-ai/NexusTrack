@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Vehicle, VehicleStatus, Driver } from '../types';
 import { 
-    Search, Plus, Battery, Signal, Eye, X, Wrench, Calendar, TrendingUp, User, MapPin, 
-    MoreVertical, Edit, Trash2, CheckCircle, AlertTriangle, FileText, ChevronRight, Phone,
-    Lock, Unlock, Shield, Zap, Circle, Loader2, Gauge, Clock, Activity, Radio, Smartphone, Download, Copy
+    Search, Plus, Battery, Signal, X, Wrench, Calendar, User, MapPin, 
+    Edit, Trash2, CheckCircle, AlertTriangle, Radio, Lock, Unlock, Shield, 
+    Circle, Loader2, Gauge, Clock, Activity, Download, Copy
 } from 'lucide-react';
 
 interface FleetManagerProps {
@@ -29,7 +29,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
   // Form States
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
-  const [showMobileGuide, setShowMobileGuide] = useState(false); // New state for tutorial
   const [formData, setFormData] = useState({
     plate: '',
     model: '',
@@ -38,9 +37,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
     status: VehicleStatus.STOPPED,
     fuelLevel: 50,
   });
-
-  // URL de ingestão baseada no ambiente
-  const ingestUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/ingest` : '';
 
   // Details Modal States
   const [detailTab, setDetailTab] = useState<'overview' | 'maintenance' | 'security'>('overview');
@@ -65,7 +61,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
 
   const handleOpenAdd = () => {
     setEditingVehicle(null);
-    setShowMobileGuide(false);
     setFormData({ plate: '', model: '', trackerId: '', driverId: '', status: VehicleStatus.STOPPED, fuelLevel: 50 });
     setIsFormOpen(true);
   };
@@ -73,7 +68,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
   const handleOpenEdit = (vehicle: Vehicle, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingVehicle(vehicle);
-    setShowMobileGuide(false);
     setFormData({
         plate: vehicle.plate,
         model: vehicle.model,
@@ -97,8 +91,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Random location for simulation if new
-    const location = editingVehicle ? editingVehicle.location : { lat: 0, lng: 0 };
+    const location = editingVehicle ? editingVehicle.location : { lat: -23.5505 + (Math.random() * 0.01), lng: -46.6333 + (Math.random() * 0.01) };
 
     const payload = {
         plate: formData.plate.toUpperCase(),
@@ -107,11 +100,10 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
         driverId: formData.driverId || undefined,
         status: formData.status as VehicleStatus,
         fuelLevel: Number(formData.fuelLevel),
-        speed: 0,
+        speed: formData.status === VehicleStatus.MOVING ? Math.floor(Math.random() * 80) + 20 : 0,
         location: location,
-        lastUpdate: 'Agora', // FIX: Added to satisfy type requirement
-        // Mantém propriedades existentes se editando
-        ignition: editingVehicle ? editingVehicle.ignition : false,
+        lastUpdate: 'Agora',
+        ignition: editingVehicle ? editingVehicle.ignition : (formData.status === VehicleStatus.MOVING),
         isLocked: editingVehicle ? editingVehicle.isLocked : false,
         geofenceActive: editingVehicle ? editingVehicle.geofenceActive : false,
         geofenceRadius: editingVehicle ? editingVehicle.geofenceRadius : 1000
@@ -119,10 +111,8 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
 
     if (editingVehicle) {
         onUpdateVehicle({ ...editingVehicle, ...payload });
-        // Toast triggered by update in App.tsx or here
     } else {
         onAddVehicle(payload);
-        // Toast triggered by update in App.tsx or here
     }
     setIsFormOpen(false);
   };
@@ -135,10 +125,9 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
       
       setLoadingAction('lock');
       
-      // Simula delay de comunicação com o rastreador
+      // Simula delay
       setTimeout(() => {
           onToggleLock(selectedVehicle.id);
-          // Update local state copy to reflect immediately in UI
           setSelectedVehicle(prev => prev ? {...prev, isLocked: isLocking, status: isLocking ? VehicleStatus.STOPPED : prev.status} : null);
           setLoadingAction(null);
           setToast({ 
@@ -180,11 +169,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
       setToast({ msg: 'Manutenção registrada.', type: 'success' });
   };
   
-  const copyToClipboard = (text: string) => {
-      navigator.clipboard.writeText(text);
-      setToast({ msg: 'URL copiada para a área de transferência!', type: 'success' });
-  };
-
   // --- HELPER FUNCTIONS ---
 
   const getDriver = (driverId?: string) => drivers.find(d => d.id === driverId);
@@ -400,49 +384,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
                 
                 <div className="overflow-y-auto custom-scrollbar p-6">
                     <form onSubmit={handleFormSubmit} className="space-y-4">
-                        
-                        {/* HELP BOX FOR MOBILE */}
-                        {!editingVehicle && (
-                            <div className={`p-4 rounded-xl border transition-all ${showMobileGuide ? 'bg-blue-900/20 border-blue-500/30' : 'bg-slate-900 border-slate-800'}`}>
-                                <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Smartphone className="w-4 h-4 text-blue-400" />
-                                        <h4 className="text-sm font-bold text-white">Como conectar o Traccar Client?</h4>
-                                    </div>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setShowMobileGuide(!showMobileGuide)} 
-                                        className="text-xs text-blue-400 hover:text-blue-300 underline"
-                                    >
-                                        {showMobileGuide ? 'Esconder Guia' : 'Ver Como'}
-                                    </button>
-                                </div>
-                                
-                                {showMobileGuide && (
-                                    <div className="mt-2 text-xs text-slate-300 space-y-3 animate-in slide-in-from-top-2">
-                                        <div className="bg-slate-950 p-2 rounded border border-slate-800/50">
-                                            <p className="font-bold text-slate-400 mb-1">1. URL do Servidor (No App):</p>
-                                            <div className="flex gap-2 items-center">
-                                                <code className="bg-black/50 px-2 py-1 rounded text-blue-300 font-mono break-all flex-1">{ingestUrl}</code>
-                                                <button type="button" onClick={() => copyToClipboard(ingestUrl)} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Copy className="w-3 h-3" /></button>
-                                            </div>
-                                        </div>
-                                        <p>2. Copie o <strong>Identificador do Dispositivo</strong> do app e cole no campo "ID do Rastreador" abaixo.</p>
-                                        <p>3. Certifique-se que a "Frequência de envio" no app é de pelo menos 10 segundos.</p>
-                                        <p>4. Ative o "Status do Serviço" no app.</p>
-                                        <div className="flex gap-2 mt-2">
-                                            <a href="https://play.google.com/store/apps/details?id=org.traccar.client" target="_blank" className="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded flex items-center gap-1">
-                                                <Download className="w-3 h-3" /> Android
-                                            </a>
-                                            <a href="https://apps.apple.com/us/app/traccar-client/id843156974" target="_blank" className="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded flex items-center gap-1">
-                                                <Download className="w-3 h-3" /> iOS
-                                            </a>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-slate-500 uppercase">Nome / Modelo</label>
                             <input 
@@ -480,7 +421,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
                                 value={formData.trackerId}
                                 onChange={e => setFormData({...formData, trackerId: e.target.value})}
                             />
-                            <p className="text-[10px] text-slate-500">Deve ser exatamente igual ao configurado no dispositivo GPS ou App.</p>
                         </div>
 
                         <div className="space-y-1">
@@ -648,17 +588,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
 
                              <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col justify-between">
                                  <div className="flex items-center gap-2 text-slate-400 mb-2">
-                                     <Zap className={`w-4 h-4 ${selectedVehicle.ignition ? 'text-yellow-400' : 'text-slate-600'}`} />
-                                     <span className="text-xs font-bold uppercase">Voltagem</span>
-                                 </div>
-                                 <div className="flex items-baseline gap-1">
-                                     <span className="text-2xl font-bold text-white">12.4</span>
-                                     <span className="text-xs text-slate-500">V</span>
-                                 </div>
-                             </div>
-
-                             <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col justify-between">
-                                 <div className="flex items-center gap-2 text-slate-400 mb-2">
                                      <Activity className="w-4 h-4 text-purple-500" />
                                      <span className="text-xs font-bold uppercase">Odômetro</span>
                                  </div>
@@ -699,9 +628,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
                                                 <span className="bg-slate-800 text-slate-300 text-xs px-2 py-1 rounded border border-slate-700 font-mono">
                                                     CNH: {getDriver(selectedVehicle.driverId)?.license}
                                                 </span>
-                                                <span className="bg-yellow-500/10 text-yellow-500 text-xs px-2 py-1 rounded border border-yellow-500/20 font-bold flex items-center gap-1">
-                                                    ★ {getDriver(selectedVehicle.driverId)?.rating}
-                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -739,18 +665,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
                                                 <span className="font-bold">Sinal GPS Forte</span>
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
-                                
-                                <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
-                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                        <Radio className="w-4 h-4" /> Dispositivo de Rastreamento
-                                    </h3>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-slate-500 text-sm">ID / IMEI:</span>
-                                        <span className="font-mono text-blue-400 bg-blue-900/20 px-2 py-1 rounded border border-blue-500/20">
-                                            {selectedVehicle.trackerId || 'Não registrado'}
-                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -944,15 +858,6 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
                                      <p>Nenhum registro de manutenção encontrado.</p>
                                  </div>
                              )}
-                         </div>
-
-                         {/* Recommendation */}
-                         <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4 flex gap-3 mt-4">
-                             <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-                             <div>
-                                 <h4 className="text-sm font-bold text-yellow-500">Próxima Revisão Recomendada</h4>
-                                 <p className="text-xs text-slate-400 mt-1">Com base na quilometragem atual, recomenda-se agendar a revisão dos 50.000km em breve.</p>
-                             </div>
                          </div>
                      </div>
                  )}

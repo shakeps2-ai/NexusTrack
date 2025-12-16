@@ -19,7 +19,7 @@ const App: React.FC = () => {
   
   // Data States
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [drivers, setDrivers] = useState(MOCK_DRIVERS); // Drivers ainda mockados por simplicidade nesta versão
+  const [drivers, setDrivers] = useState(MOCK_DRIVERS);
   const [alerts, setAlerts] = useState(MOCK_ALERTS);
 
   // Auth States
@@ -45,22 +45,29 @@ const App: React.FC = () => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // --- DATA FETCHING ENGINE ---
+  // --- MOCK DATA ENGINE ---
   useEffect(() => {
     if (!isAuthenticated) return;
     
-    // Função para buscar dados da API Real
     const fetchData = async () => {
         const data = await traccarApi.getDevices();
         if (data && data.length > 0) {
-            setVehicles(data);
+            setVehicles([...data]);
         }
     };
 
-    fetchData(); // Busca inicial
+    fetchData();
 
-    // Polling a cada 5 segundos para atualizar posições
-    const interval = setInterval(fetchData, 5000);
+    // Simulação de movimento em tempo real (Mock)
+    const interval = setInterval(() => {
+        // @ts-ignore - Método específico do Mock Service
+        if (typeof traccarApi.simulateMovement === 'function') {
+            // @ts-ignore
+            traccarApi.simulateMovement();
+        }
+        fetchData();
+    }, 2000); // Atualiza a cada 2 segundos para dar sensação de tempo real
+
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
@@ -72,31 +79,31 @@ const App: React.FC = () => {
       setAuthError(null);
 
       try {
-        if (isRegistering) {
-            const res = await traccarApi.register('', loginForm.name, loginForm.email, loginForm.password);
-            if (res.success) {
+        // Simulação de delay para parecer real
+        const res = isRegistering 
+            ? await traccarApi.register('', loginForm.name, loginForm.email, loginForm.password)
+            : await traccarApi.login('', loginForm.email, loginForm.password);
+
+        if (res.success) {
+            if (isRegistering) {
                 setIsRegistering(false);
                 setAuthError("Conta criada! Faça login.");
             } else {
-                setAuthError("Erro ao criar conta.");
-            }
-            setIsConnecting(false);
-        } else {
-            const res = await traccarApi.login('', loginForm.email, loginForm.password);
-            if (res.success) {
                 setIsAuthenticated(true);
-                setUserProfile(prev => ({ 
-                    ...prev, 
-                    email: res.user.email, 
-                    name: res.user.name 
-                }));
-            } else {
-                setAuthError("Email ou senha inválidos.");
+                if (res.user) {
+                    setUserProfile(prev => ({ 
+                        ...prev, 
+                        email: res.user.email, 
+                        name: res.user.name 
+                    }));
+                }
             }
-            setIsConnecting(false);
+        } else {
+            setAuthError(res.error || "Erro de autenticação");
         }
       } catch (err) {
           setAuthError("Erro de conexão.");
+      } finally {
           setIsConnecting(false);
       }
   };
@@ -104,39 +111,27 @@ const App: React.FC = () => {
   const handleAddVehicle = async (newVehicle: Omit<Vehicle, 'id'>) => {
       const tempId = `v-${Date.now()}`;
       const payload = { ...newVehicle, id: tempId };
-      
-      const success = await traccarApi.addDevice(payload);
-      if (success) {
-          // Atualiza localmente para feedback instantâneo
-          setVehicles(prev => [...prev, payload as Vehicle]);
-      } else {
-          alert("Erro ao salvar no banco de dados.");
-      }
+      await traccarApi.addDevice(payload);
+      setVehicles(prev => [...prev, payload as Vehicle]);
   };
 
   const handleUpdateVehicle = async (updatedVehicle: Vehicle) => {
-      const success = await traccarApi.addDevice(updatedVehicle); // Reutiliza upsert
-      if (success) {
-        setVehicles(prev => prev.map(v => v.id === updatedVehicle.id ? updatedVehicle : v));
-      }
+      await traccarApi.addDevice(updatedVehicle);
+      setVehicles(prev => prev.map(v => v.id === updatedVehicle.id ? updatedVehicle : v));
   };
 
   const handleDeleteVehicle = async (id: string) => {
-      const success = await traccarApi.deleteDevice(id);
-      if(success) {
-        setVehicles(prev => prev.filter(v => v.id !== id));
-      }
+      await traccarApi.deleteDevice(id);
+      setVehicles(prev => prev.filter(v => v.id !== id));
   };
   
   const handleToggleLock = async (id: string) => {
-    const success = await traccarApi.toggleLock(id);
-    if (success) {
-        setVehicles(prev => prev.map(v => v.id === id ? { 
-            ...v, 
-            isLocked: !v.isLocked, 
-            status: !v.isLocked ? VehicleStatus.STOPPED : v.status 
-        } : v));
-    }
+    await traccarApi.toggleLock(id);
+    setVehicles(prev => prev.map(v => v.id === id ? { 
+        ...v, 
+        isLocked: !v.isLocked, 
+        status: !v.isLocked ? VehicleStatus.STOPPED : v.status 
+    } : v));
   };
   
   const handleUpdateGeofence = (id: string, active: boolean, radius: number) => setVehicles(prev => prev.map(v => v.id === id ? { ...v, geofenceActive: active, geofenceRadius: radius } : v));
@@ -185,7 +180,7 @@ const App: React.FC = () => {
 
                       <div className="space-y-1">
                           <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
-                          <input type="email" required placeholder="admin@empresa.com" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
+                          <input type="text" required placeholder="admin@empresa.com" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
                       </div>
                       <div className="space-y-1">
                           <label className="text-xs font-bold text-slate-500 uppercase">Senha</label>
