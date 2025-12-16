@@ -10,8 +10,8 @@ import { UserProfile } from './components/UserProfile';
 import { NotificationPanel } from './components/NotificationPanel';
 import { NotificationHistory } from './components/NotificationHistory';
 import { ViewState, Driver, Vehicle, VehicleStatus } from './types';
-import { MOCK_DRIVERS, MOCK_ALERTS, MOCK_VEHICLES } from './constants';
-import { Bell, Search, User, Server, LogIn, Loader2, HelpCircle, Settings, ChevronDown, ChevronUp, PlayCircle, TestTube, LogOut, UserPlus, WifiOff, ShieldAlert } from 'lucide-react';
+import { MOCK_DRIVERS, MOCK_ALERTS } from './constants';
+import { Bell, User, Server, LogIn, Loader2, PlayCircle, LogOut, UserPlus, ShieldCheck } from 'lucide-react';
 import { traccarApi } from './services/traccarApi';
 
 const App: React.FC = () => {
@@ -19,24 +19,16 @@ const App: React.FC = () => {
   
   // Data States
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [drivers, setDrivers] = useState(MOCK_DRIVERS);
+  const [drivers, setDrivers] = useState(MOCK_DRIVERS); // Drivers ainda mockados por simplicidade nesta versão
   const [alerts, setAlerts] = useState(MOCK_ALERTS);
 
   // Auth States
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [showServerSettings, setShowServerSettings] = useState(false);
-  const [authError, setAuthError] = useState<{title: string, msg: string, type?: 'error' | 'warning'} | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   
-  // Detecção de Ambiente
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  // No Netlify, usamos '' (vazio) para conectar na mesma origem e deixar o netlify.toml redirecionar
-  const defaultServer = isLocal ? 'http://localhost:3001' : '';
-
   const [loginForm, setLoginForm] = useState({
-      server: defaultServer,
       name: '', 
       email: '',
       password: ''
@@ -53,201 +45,100 @@ const App: React.FC = () => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // --- MOCK SIMULATION (DEMO) ---
+  // --- DATA FETCHING ENGINE ---
   useEffect(() => {
-    if (!isAuthenticated || !isDemoMode) return;
-    const interval = setInterval(() => {
-        setVehicles(prev => prev.map(v => {
-            if (v.status === VehicleStatus.MOVING && !v.isLocked) {
-                return {
-                    ...v,
-                    speed: Math.max(20, Math.min(120, Math.round(v.speed + (Math.random() * 10 - 5)))),
-                    location: {
-                        lat: v.location.lat + (Math.random() * 0.002 - 0.001),
-                        lng: v.location.lng + (Math.random() * 0.002 - 0.001)
-                    },
-                    fuelLevel: Math.max(0, v.fuelLevel - (Math.random() * 0.1))
-                };
-            }
-            return v;
-        }));
-    }, 3000);
+    if (!isAuthenticated) return;
+    
+    // Função para buscar dados da API Real
+    const fetchData = async () => {
+        const data = await traccarApi.getDevices();
+        if (data && data.length > 0) {
+            setVehicles(data);
+        }
+    };
+
+    fetchData(); // Busca inicial
+
+    // Polling a cada 5 segundos para atualizar posições
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
-  }, [isAuthenticated, isDemoMode]);
+  }, [isAuthenticated]);
 
   // --- HANDLERS ---
 
   const handleAuth = async (e: React.FormEvent) => {
       e.preventDefault();
-      setAuthError(null);
-      
-      let serverUrl = loginForm.server;
-      // Se a URL for a mesma da origem ou vazia, significa que estamos usando o proxy do Netlify
-      if (serverUrl === window.location.origin) serverUrl = ''; 
-
       setIsConnecting(true);
+      setAuthError(null);
 
       try {
         if (isRegistering) {
-            // REGISTRO
-            const result = await traccarApi.register(serverUrl, loginForm.name, loginForm.email, loginForm.password);
-            
-            if (result.success) {
-                const loginResult = await traccarApi.login(serverUrl, loginForm.email, loginForm.password);
-                if (loginResult.success) {
-                    completeLogin(loginForm.email, loginForm.name);
-                } else {
-                     setIsRegistering(false);
-                     setIsConnecting(false);
-                     alert("Conta criada! Faça login para continuar.");
-                }
+            const res = await traccarApi.register('', loginForm.name, loginForm.email, loginForm.password);
+            if (res.success) {
+                setIsRegistering(false);
+                setAuthError("Conta criada! Faça login.");
             } else {
-                handleAuthError(result);
-                setIsConnecting(false);
+                setAuthError("Erro ao criar conta.");
             }
+            setIsConnecting(false);
         } else {
-            // LOGIN
-            const result = await traccarApi.login(serverUrl, loginForm.email, loginForm.password);
-            
-            if (result.success) {
-                completeLogin(loginForm.email, loginForm.email.split('@')[0]);
+            const res = await traccarApi.login('', loginForm.email, loginForm.password);
+            if (res.success) {
+                setIsAuthenticated(true);
+                setUserProfile(prev => ({ 
+                    ...prev, 
+                    email: res.user.email, 
+                    name: res.user.name 
+                }));
             } else {
-                handleAuthError(result);
-                setIsConnecting(false);
+                setAuthError("Email ou senha inválidos.");
             }
+            setIsConnecting(false);
         }
       } catch (err) {
-          console.error(err);
-          setAuthError({ title: "Erro Inesperado", msg: "Ocorreu um erro na aplicação.", type: 'error' });
+          setAuthError("Erro de conexão.");
           setIsConnecting(false);
       }
   };
 
-  const handleAuthError = (result: any) => {
-      if (result.error === 'NETWORK_ERROR') {
-          setAuthError({ 
-              title: "Erro de Conexão", 
-              msg: "Não foi possível conectar ao servidor. Verifique se o IP da VPS está correto no arquivo netlify.toml.",
-              type: 'error'
-          });
-      } else if (result.error === 'INVALID_CREDENTIALS') {
-           setAuthError({ 
-              title: "Credenciais Inválidas", 
-              msg: "Email ou senha incorretos.",
-              type: 'error'
-          });
-      } else {
-           setAuthError({ 
-              title: "Falha na Operação", 
-              msg: result.details || "Erro desconhecido.",
-              type: 'error'
-          });
-      }
-  };
-
-  const completeLogin = (email: string, name: string) => {
-      setIsAuthenticated(true);
-      setIsDemoMode(false);
-      setUserProfile(prev => ({ ...prev, email: email, name: name }));
-      initializeData();
-  };
-
-  const initializeData = async () => {
-      const devices = await traccarApi.getDevices();
-      const positions = await traccarApi.getPositions();
-
-      const mappedVehicles = devices.map((device: any) => {
-          const pos = positions.find((p: any) => p.deviceId === device.id);
-          return traccarApi.mapToVehicle(device, pos);
-      });
-
-      setVehicles(mappedVehicles);
-      setIsConnecting(false);
-
-      traccarApi.connectSocket((data) => {
-          handleSocketUpdate(data);
-      });
-  };
-
-  const handleSocketUpdate = (data: any) => {
-      setVehicles(prevVehicles => {
-          let updatedList = [...prevVehicles];
-
-          if (data.positions) {
-              data.positions.forEach((pos: any) => {
-                  const idx = updatedList.findIndex(v => v.id === String(pos.deviceId));
-                  if (idx !== -1) {
-                      const v = updatedList[idx];
-                      updatedList[idx] = {
-                          ...v,
-                          location: { lat: pos.latitude, lng: pos.longitude },
-                          speed: Math.round(pos.speed * 1.852),
-                          ignition: pos.attributes?.ignition ?? v.ignition,
-                          fuelLevel: pos.attributes?.fuelLevel ?? v.fuelLevel,
-                          isLocked: pos.attributes?.blocked ?? v.isLocked,
-                          lastUpdate: 'Agora',
-                          status: pos.speed > 0 ? VehicleStatus.MOVING : VehicleStatus.STOPPED
-                      };
-                  }
-              });
-          }
-          if (data.devices) {
-              data.devices.forEach((dev: any) => {
-                   const idx = updatedList.findIndex(v => v.id === String(dev.id));
-                   if (idx !== -1) {
-                       const v = updatedList[idx];
-                       updatedList[idx] = {
-                           ...v,
-                           plate: dev.name,
-                           model: dev.model || v.model,
-                           status: dev.status === 'offline' ? VehicleStatus.OFFLINE : v.status
-                       };
-                   } else {
-                       updatedList.push(traccarApi.mapToVehicle(dev));
-                   }
-              });
-          }
-          return updatedList;
-      });
-  };
-
-  // --- CRUD WRAPPERS ---
   const handleAddVehicle = async (newVehicle: Omit<Vehicle, 'id'>) => {
-      if (isDemoMode) {
-          const mockVehicle: Vehicle = {
-              ...newVehicle, id: `v-sim-${Date.now()}`, lastUpdate: 'Agora', ignition: true, isLocked: false, geofenceActive: false, geofenceRadius: 1000,
-              location: { lat: -23.5505, lng: -46.6333 }, speed: 0, fuelLevel: 100
-          };
-          setVehicles(prev => [...prev, mockVehicle]);
-          return;
-      }
-      const result = await traccarApi.addDevice({ name: newVehicle.plate, uniqueId: newVehicle.trackerId || '', model: newVehicle.model });
-      if (result) {
-          const mapped = traccarApi.mapToVehicle(result);
-          setVehicles(prev => [...prev, mapped]);
-          alert("Dispositivo registrado! Configure o rastreador para apontar para o IP da sua VPS.");
+      const tempId = `v-${Date.now()}`;
+      const payload = { ...newVehicle, id: tempId };
+      
+      const success = await traccarApi.addDevice(payload);
+      if (success) {
+          // Atualiza localmente para feedback instantâneo
+          setVehicles(prev => [...prev, payload as Vehicle]);
       } else {
-          alert("Erro ao registrar. Verifique se o ID já existe.");
+          alert("Erro ao salvar no banco de dados.");
       }
   };
-  const handleUpdateVehicle = (updatedVehicle: Vehicle) => setVehicles(prev => prev.map(v => v.id === updatedVehicle.id ? updatedVehicle : v));
-  const handleDeleteVehicle = (id: string) => setVehicles(prev => prev.filter(v => v.id !== id));
+
+  const handleUpdateVehicle = async (updatedVehicle: Vehicle) => {
+      const success = await traccarApi.addDevice(updatedVehicle); // Reutiliza upsert
+      if (success) {
+        setVehicles(prev => prev.map(v => v.id === updatedVehicle.id ? updatedVehicle : v));
+      }
+  };
+
+  const handleDeleteVehicle = async (id: string) => {
+      const success = await traccarApi.deleteDevice(id);
+      if(success) {
+        setVehicles(prev => prev.filter(v => v.id !== id));
+      }
+  };
+  
   const handleToggleLock = async (id: string) => {
-    if (isDemoMode) {
-        setVehicles(prev => prev.map(v => v.id === id ? { ...v, isLocked: !v.isLocked } : v));
-        return;
-    }
-    const vehicle = vehicles.find(v => v.id === id);
-    if (!vehicle) return;
-    const commandType = vehicle.isLocked ? 'engineResume' : 'engineStop';
-    const success = await traccarApi.sendCommand(parseInt(id), commandType);
+    const success = await traccarApi.toggleLock(id);
     if (success) {
-        setVehicles(prev => prev.map(v => v.id === id ? { ...v, isLocked: !v.isLocked } : v));
-        alert(`Comando enviado com sucesso!`);
-    } else {
-        alert("Erro ao enviar comando de bloqueio.");
+        setVehicles(prev => prev.map(v => v.id === id ? { 
+            ...v, 
+            isLocked: !v.isLocked, 
+            status: !v.isLocked ? VehicleStatus.STOPPED : v.status 
+        } : v));
     }
   };
+  
   const handleUpdateGeofence = (id: string, active: boolean, radius: number) => setVehicles(prev => prev.map(v => v.id === id ? { ...v, geofenceActive: active, geofenceRadius: radius } : v));
 
   // --- RENDER ---
@@ -269,54 +160,22 @@ const App: React.FC = () => {
               <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-300">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
                   
-                  <div className="flex flex-col items-center mb-6 relative z-10">
+                  <div className="flex flex-col items-center mb-8 relative z-10">
                       <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-900/50 mb-4">
                           <Server className="w-8 h-8 text-white" />
                       </div>
                       <h1 className="text-2xl font-bold text-white">NexusTrack <span className="text-blue-500">Premium</span></h1>
-                      <p className="text-slate-400 text-sm mt-2">Conecte sua frota ao futuro.</p>
+                      <p className="text-slate-400 text-sm mt-2">Plataforma Inteligente de Gestão</p>
                   </div>
 
                   {authError && (
-                      <div className={`mb-6 p-4 rounded-xl relative z-10 flex items-start gap-3 border ${authError.type === 'warning' ? 'bg-yellow-900/20 border-yellow-500/30' : 'bg-red-900/20 border-red-500/30'}`}>
-                          {authError.type === 'warning' ? <ShieldAlert className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" /> : <WifiOff className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />}
-                          <div>
-                              <h4 className={`text-sm font-bold mb-1 ${authError.type === 'warning' ? 'text-yellow-400' : 'text-red-400'}`}>{authError.title}</h4>
-                              <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{authError.msg}</p>
-                          </div>
+                      <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm text-center relative z-10">
+                          {authError}
                       </div>
-                  )}
-
-                  {!authError && (
-                    <div className="mb-6 p-4 bg-blue-900/20 border border-blue-500/20 rounded-xl relative z-10">
-                        <h4 className="text-sm font-bold text-blue-400 flex items-center gap-2 mb-2">
-                            <HelpCircle className="w-4 h-4" />
-                            {isLocal ? "Ambiente Local" : "Netlify Cloud (Proxy Ativo)"}
-                        </h4>
-                        <p className="text-xs text-slate-300 leading-relaxed">
-                            {isLocal 
-                            ? "Conectando via Proxy Local (:3001). Certifique-se que 'npm start' está rodando na pasta server/." 
-                            : "Conexão segura via Proxy Netlify configurado."}
-                        </p>
-                    </div>
                   )}
 
                   <form onSubmit={handleAuth} className="space-y-4 relative z-10">
                       
-                      <div className="flex justify-end">
-                        <button type="button" onClick={() => setShowServerSettings(!showServerSettings)} className="text-xs text-slate-500 hover:text-blue-400 flex items-center gap-1 transition-colors">
-                            <Settings className="w-3 h-3" /> Configurações de Servidor {showServerSettings ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        </button>
-                      </div>
-
-                      {showServerSettings && (
-                          <div className="space-y-1 animate-in slide-in-from-top-2">
-                              <label className="text-xs font-bold text-slate-500 uppercase">URL do Servidor</label>
-                              <input type="url" required={!isDemoMode} placeholder="Deixe vazio para usar Proxy Netlify" value={loginForm.server} onChange={e => setLoginForm({...loginForm, server: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
-                              <p className="text-[10px] text-slate-500">No Netlify, deixe vazio e configure o IP no netlify.toml</p>
-                          </div>
-                      )}
-
                       {isRegistering && (
                           <div className="space-y-1 animate-in slide-in-from-left-2">
                               <label className="text-xs font-bold text-slate-500 uppercase">Nome</label>
@@ -326,16 +185,16 @@ const App: React.FC = () => {
 
                       <div className="space-y-1">
                           <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
-                          <input type="email" required={!isDemoMode} placeholder="admin@admin.com" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
+                          <input type="email" required placeholder="admin@empresa.com" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
                       </div>
                       <div className="space-y-1">
                           <label className="text-xs font-bold text-slate-500 uppercase">Senha</label>
-                          <input type="password" required={!isDemoMode} placeholder="••••••••" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
+                          <input type="password" required placeholder="••••••••" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
                       </div>
 
                       <button type="submit" disabled={isConnecting} className={`w-full font-bold py-3.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 mt-4 ${isRegistering ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}>
                           {isConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : isRegistering ? <UserPlus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
-                          {isConnecting ? 'Conectando...' : (isRegistering ? 'Criar Conta' : 'Acessar Conta')}
+                          {isConnecting ? 'Acessando...' : (isRegistering ? 'Criar Conta' : 'Entrar na Plataforma')}
                       </button>
 
                       <div className="text-center pt-2">
@@ -343,12 +202,6 @@ const App: React.FC = () => {
                               {isRegistering ? "Já tem uma conta? Faça Login" : "Não tem conta? Crie uma grátis"}
                           </button>
                       </div>
-
-                      <div className="relative flex py-2 items-center"><div className="flex-grow border-t border-slate-800"></div><span className="flex-shrink-0 mx-4 text-xs text-slate-500">OU</span><div className="flex-grow border-t border-slate-800"></div></div>
-
-                      <button type="button" onClick={() => { setIsConnecting(true); setTimeout(() => { setIsDemoMode(true); setIsAuthenticated(true); setUserProfile({name:'Demo',email:'demo@teste.com',phone:'',company:'Demo'}); setIsConnecting(false); }, 1500); }} disabled={isConnecting} className="w-full bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white font-medium py-3 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2">
-                          <TestTube className="w-5 h-5 text-blue-500" /> Modo Simulação
-                      </button>
                   </form>
               </div>
           </div>
@@ -364,7 +217,6 @@ const App: React.FC = () => {
              <div className="md:hidden mr-3 p-2 bg-blue-600/10 rounded-lg text-blue-500"><span className="font-bold">NT</span></div>
              <span className="opacity-50 hidden md:inline">NexusTrack</span><span className="mx-2 hidden md:inline">/</span>
              <span className="text-white font-medium capitalize">{currentView}</span>
-             {isDemoMode && <span className="ml-3 px-2 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-[10px] font-bold uppercase flex items-center gap-1"><PlayCircle className="w-3 h-3" /> Demo</span>}
            </div>
            <div className="flex items-center gap-4 md:gap-6">
                 <div className="relative"><button onClick={() => { setIsNotificationsOpen(!isNotificationsOpen); setIsProfileOpen(false); }} className="relative text-slate-400 hover:text-white transition-colors p-2"><Bell className="w-5 h-5" /><span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span></button><NotificationPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} alerts={alerts} onViewHistory={() => setCurrentView('notifications')} /></div>

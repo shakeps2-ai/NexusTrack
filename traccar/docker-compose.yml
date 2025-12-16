@@ -1,22 +1,2 @@
-version: '3'
-services:
-  traccar:
-    image: traccar/traccar:latest
-    restart: always
-    container_name: traccar
-    hostname: traccar
-    ports:
-      - "80:8082"
-      - "5000-5150:5000-5150"
-      - "5000-5150:5000-5150/udp"
-    volumes:
-      - ./traccar.xml:/opt/traccar/conf/traccar.xml:ro
-      - ./logs:/opt/traccar/logs:rw
-    environment:
-      - TZ=America/Sao_Paulo
-
-# INSTRUÇÕES DE USO NA VPS:
-# 1. Crie uma pasta: mkdir my-traccar && cd my-traccar
-# 2. Suba o arquivo traccar.xml e este docker-compose.yml para essa pasta.
-# 3. Rode: docker-compose up -d
-# 4. Seu servidor estará rodando na porta 80 (http://seu-ip-vps)
+# Traccar Docker Compose Disabled
+# Use a standalone frontend version.
