@@ -60,11 +60,7 @@ const App: React.FC = () => {
 
     // Simulação de movimento em tempo real (Mock)
     const interval = setInterval(() => {
-        // @ts-ignore - Método específico do Mock Service
-        if (typeof traccarApi.simulateMovement === 'function') {
-            // @ts-ignore
-            traccarApi.simulateMovement();
-        }
+        traccarApi.simulateMovement();
         fetchData();
     }, 2000); // Atualiza a cada 2 segundos para dar sensação de tempo real
 

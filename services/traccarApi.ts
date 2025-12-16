@@ -1,7 +1,7 @@
 import { Vehicle, VehicleStatus } from '../types';
 import { MOCK_VEHICLES } from '../constants';
 
-interface AuthResponse {
+export interface AuthResponse {
   success: boolean;
   user?: {
     id: number;
