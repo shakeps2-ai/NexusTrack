@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
@@ -9,13 +10,19 @@ import { AIAnalyst } from './components/AIAnalyst';
 import { UserProfile } from './components/UserProfile';
 import { NotificationPanel } from './components/NotificationPanel';
 import { NotificationHistory } from './components/NotificationHistory';
-import { ViewState, Driver, Vehicle, VehicleStatus } from './types';
+import { LandingPage } from './components/LandingPage';
+import { ViewState, Vehicle, VehicleStatus } from './types'; // Removed unused imports for cleaner code
 import { MOCK_DRIVERS, MOCK_ALERTS } from './constants';
-import { Bell, User, Server, LogIn, Loader2, PlayCircle, LogOut, UserPlus, ShieldCheck } from 'lucide-react';
+import { Bell, User, Server, LogIn, Loader2, LogOut, UserPlus, ArrowLeft } from 'lucide-react';
 import { traccarApi } from './services/traccarApi';
 
 const App: React.FC = () => {
+  // Navigation States
+  const [showLanding, setShowLanding] = useState(true);
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  
+  // Action State (Para Deep Linking interno: Ex: Dashboard -> Abrir Modal em Frota)
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   
   // Data States
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -62,12 +69,18 @@ const App: React.FC = () => {
     const interval = setInterval(() => {
         traccarApi.simulateMovement();
         fetchData();
-    }, 2000); // Atualiza a cada 2 segundos para dar sensação de tempo real
+    }, 2000); 
 
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
   // --- HANDLERS ---
+  
+  const handleEnterApp = (registerMode: boolean = false) => {
+      setIsRegistering(registerMode);
+      setShowLanding(false);
+      setAuthError(null);
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -75,7 +88,6 @@ const App: React.FC = () => {
       setAuthError(null);
 
       try {
-        // Simulação de delay para parecer real
         const res = isRegistering 
             ? await traccarApi.register('', loginForm.name, loginForm.email, loginForm.password)
             : await traccarApi.login('', loginForm.email, loginForm.password);
@@ -104,6 +116,7 @@ const App: React.FC = () => {
       }
   };
 
+  // --- CRUD HANDLERS ---
   const handleAddVehicle = async (newVehicle: Omit<Vehicle, 'id'>) => {
       const tempId = `v-${Date.now()}`;
       const payload = { ...newVehicle, id: tempId };
@@ -132,31 +145,96 @@ const App: React.FC = () => {
   
   const handleUpdateGeofence = (id: string, active: boolean, radius: number) => setVehicles(prev => prev.map(v => v.id === id ? { ...v, geofenceActive: active, geofenceRadius: radius } : v));
 
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setVehicles([]);
+    setShowLogoutConfirm(false);
+    setShowLanding(true);
+  };
+
+  // --- QUICK ACTION HANDLER ---
+  const handleQuickAction = (action: string) => {
+      if (action === 'add_vehicle') {
+          setCurrentView('fleet');
+          setPendingAction('open_add_vehicle');
+      } else if (action === 'add_driver') {
+          setCurrentView('employees');
+          setPendingAction('open_add_driver');
+      } else if (action === 'map') {
+          setCurrentView('map');
+      }
+  };
+
+  const consumePendingAction = () => setPendingAction(null);
+
   // --- RENDER ---
   const renderContent = () => {
     switch (currentView) {
-      case 'dashboard': return <Dashboard vehicles={vehicles} alerts={alerts} />;
-      case 'map': return <MapTracker vehicles={vehicles} onToggleLock={handleToggleLock} />;
-      case 'fleet': return <FleetManager vehicles={vehicles} drivers={drivers} onAddVehicle={handleAddVehicle} onUpdateVehicle={handleUpdateVehicle} onDeleteVehicle={handleDeleteVehicle} onToggleLock={handleToggleLock} onUpdateGeofence={handleUpdateGeofence} />;
-      case 'employees': return <EmployeeList drivers={drivers} vehicles={vehicles} onAddDriver={(d)=>{setDrivers(p=>[...p,{...d,id:`d${Date.now()}`,rating:5}])}} onUpdateDriver={(d)=>{setDrivers(p=>p.map(x=>x.id===d.id?d:x))}} onDeleteDriver={(id)=>{setDrivers(p=>p.filter(x=>x.id!==id))}} />;
-      case 'analytics': return <AIAnalyst vehicles={vehicles} drivers={drivers} alerts={alerts} />;
-      case 'notifications': return <NotificationHistory alerts={alerts} />;
-      default: return <Dashboard vehicles={vehicles} alerts={alerts} />;
+      case 'dashboard': 
+        return <Dashboard vehicles={vehicles} alerts={alerts} onQuickAction={handleQuickAction} />;
+      case 'map': 
+        return <MapTracker vehicles={vehicles} onToggleLock={handleToggleLock} />;
+      case 'fleet': 
+        return (
+            <FleetManager 
+                vehicles={vehicles} 
+                drivers={drivers} 
+                onAddVehicle={handleAddVehicle} 
+                onUpdateVehicle={handleUpdateVehicle} 
+                onDeleteVehicle={handleDeleteVehicle} 
+                onToggleLock={handleToggleLock} 
+                onUpdateGeofence={handleUpdateGeofence}
+                initialAction={pendingAction}
+                onClearAction={consumePendingAction}
+            />
+        );
+      case 'employees': 
+        return (
+            <EmployeeList 
+                drivers={drivers} 
+                vehicles={vehicles} 
+                onAddDriver={(d)=>{setDrivers(p=>[...p,{...d,id:`d${Date.now()}`,rating:5}])}} 
+                onUpdateDriver={(d)=>{setDrivers(p=>p.map(x=>x.id===d.id?d:x))}} 
+                onDeleteDriver={(id)=>{setDrivers(p=>p.filter(x=>x.id!==id))}}
+                initialAction={pendingAction}
+                onClearAction={consumePendingAction}
+            />
+        );
+      case 'analytics': 
+        return <AIAnalyst vehicles={vehicles} drivers={drivers} alerts={alerts} />;
+      case 'notifications': 
+        return <NotificationHistory alerts={alerts} />;
+      default: 
+        return <Dashboard vehicles={vehicles} alerts={alerts} onQuickAction={handleQuickAction} />;
     }
   };
 
+  if (!isAuthenticated && showLanding) {
+    return <LandingPage onEnterApp={handleEnterApp} />;
+  }
+
   if (!isAuthenticated) {
       return (
-          <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-              <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+          <div className="h-screen overflow-y-auto bg-slate-950 flex items-center justify-center p-4">
+              <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-300 my-auto">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
                   
+                  <div className="relative z-10 mb-6">
+                      <button 
+                        onClick={() => setShowLanding(true)}
+                        className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-sm mb-4"
+                      >
+                          <ArrowLeft className="w-4 h-4" />
+                          Voltar ao Site
+                      </button>
+                  </div>
+
                   <div className="flex flex-col items-center mb-8 relative z-10">
                       <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-900/50 mb-4">
                           <Server className="w-8 h-8 text-white" />
                       </div>
                       <h1 className="text-2xl font-bold text-white">NexusTrack <span className="text-blue-500">Premium</span></h1>
-                      <p className="text-slate-400 text-sm mt-2">Plataforma Inteligente de Gestão</p>
+                      <p className="text-slate-400 text-sm mt-2">{isRegistering ? 'Crie sua conta empresarial' : 'Plataforma Inteligente de Gestão'}</p>
                   </div>
 
                   {authError && (
@@ -228,7 +306,7 @@ const App: React.FC = () => {
                 <h3 className="text-xl font-bold text-white mb-2">Encerrar Sessão?</h3>
                 <div className="flex gap-3 w-full mt-6">
                     <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300">Cancelar</button>
-                    <button onClick={() => { setIsAuthenticated(false); setVehicles([]); setShowLogoutConfirm(false); }} className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold">Sair Agora</button>
+                    <button onClick={handleLogout} className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold">Sair Agora</button>
                 </div>
             </div>
         </div>

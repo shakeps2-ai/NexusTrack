@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Driver, Vehicle } from '../types';
 import { Star, Phone, FileText, Search, Plus, MoreVertical, Edit, Trash2, X, Check, Truck, User, Shield } from 'lucide-react';
 
@@ -8,9 +9,14 @@ interface EmployeeListProps {
   onAddDriver: (driver: Omit<Driver, 'id'>) => void;
   onUpdateDriver: (driver: Driver) => void;
   onDeleteDriver: (id: string) => void;
+  initialAction?: string | null;
+  onClearAction?: () => void;
 }
 
-export const EmployeeList: React.FC<EmployeeListProps> = ({ drivers, vehicles, onAddDriver, onUpdateDriver, onDeleteDriver }) => {
+export const EmployeeList: React.FC<EmployeeListProps> = ({ 
+    drivers, vehicles, onAddDriver, onUpdateDriver, onDeleteDriver,
+    initialAction, onClearAction
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   
@@ -29,6 +35,14 @@ export const EmployeeList: React.FC<EmployeeListProps> = ({ drivers, vehicles, o
     avatar: ''
   };
   const [formData, setFormData] = useState(initialFormState);
+
+  // --- ACTION HANDLER (Auto Open) ---
+  useEffect(() => {
+    if (initialAction === 'open_add_driver') {
+        handleOpenAdd();
+        if (onClearAction) onClearAction();
+    }
+  }, [initialAction]);
 
   // Filter Logic
   const filteredDrivers = drivers.filter(driver => {
