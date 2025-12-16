@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, Shield, Bell, CreditCard, Mail, Phone, Building, Check, X, Camera, Key, Lock, ChevronRight, AlertCircle, Loader2, LogOut } from 'lucide-react';
 
@@ -65,7 +66,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose, onLog
   // Handlers
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    // Fix: Type assertion for the dynamic key to avoid TS build error
+    setFormData(prev => ({ ...prev, [name as keyof typeof formData]: value }));
   };
 
   const toggleNotification = (key: keyof typeof notifications) => {
