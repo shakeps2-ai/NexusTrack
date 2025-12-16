@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
+<properties>
+
+    <!-- 
+        CONFIGURAÇÃO DE BANCO DE DADOS NEON (PostgreSQL)
+        
+        Copie este arquivo para sua VPS em: /opt/traccar/conf/traccar.xml
+        Ou se usar Docker, monte este arquivo no volume correto.
+    -->
+
+    <entry key='database.driver'>org.postgresql.Driver</entry>
+    <entry key='database.url'>jdbc:postgresql://ep-super-dream-a471bclv-pooler.us-east-1.aws.neon.tech:5432/neondb?sslmode=require</entry>
+    <entry key='database.user'>neondb_owner</entry>
+    <entry key='database.password'>npg_MumWqS1KHc3i</entry>
+    
+    <!-- Otimização de Conexão -->
+    <entry key='database.maxPoolSize'>10</entry>
+    <entry key='database.validationQuery'>SELECT 1</entry>
+    <entry key='database.changelogLockPollRate'>60</entry>
+    
+    <!-- Configurações do Servidor -->
+    <entry key='server.port'>8082</entry>
+    <entry key='web.enable'>true</entry>
+    
+    <!-- Geocodificação -->
+    <entry key='geocoder.enable'>true</entry>
+    <entry key='geocoder.type'>nominatim</entry>
+    <entry key='geocoder.url'>https://nominatim.openstreetmap.org/reverse</entry>
+    <entry key='geocoder.onRequest'>true</entry>
+    <entry key='geocoder.ignorePositions'>false</entry>
+
+</properties>

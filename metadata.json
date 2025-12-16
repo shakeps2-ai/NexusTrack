@@ -1,0 +1,7 @@
+{
+  "name": "NexusTrack Premium",
+  "description": "Plataforma de rastreamento veicular de alta performance com gestão de frota, funcionários e inteligência artificial.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

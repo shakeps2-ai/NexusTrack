@@ -1,0 +1,66 @@
+import React from 'react';
+import { ViewState } from '../types';
+import { LayoutDashboard, Map, Truck, Users, Activity, LogOut } from 'lucide-react';
+
+interface SidebarProps {
+  currentView: ViewState;
+  onChangeView: (view: ViewState) => void;
+  onLogout: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onLogout }) => {
+  const menuItems = [
+    { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
+    { id: 'map', label: 'Monitoramento', icon: Map },
+    { id: 'fleet', label: 'Gestão de Frota', icon: Truck },
+    { id: 'employees', label: 'Funcionários', icon: Users },
+    { id: 'analytics', label: 'Nexus AI', icon: Activity },
+  ];
+
+  return (
+    <aside className="hidden md:flex w-64 bg-slate-950 border-r border-slate-800 flex-col h-full shadow-xl z-20">
+      <div className="p-6 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+          <Truck className="text-white w-5 h-5" />
+        </div>
+        <span className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+          NexusTrack
+        </span>
+      </div>
+
+      <nav className="flex-1 px-4 py-4 space-y-2">
+        {menuItems.map((item) => {
+          const isActive = currentView === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onChangeView(item.id as ViewState)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                isActive
+                  ? 'bg-blue-600/10 text-blue-400 border border-blue-600/20 shadow-md shadow-blue-900/10'
+                  : 'text-slate-400 hover:bg-slate-900 hover:text-white'
+              }`}
+            >
+              <item.icon
+                className={`w-5 h-5 transition-colors ${
+                  isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-white'
+                }`}
+              />
+              <span className="font-medium">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="p-4 border-t border-slate-900">
+        <button 
+          onClick={onLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-red-400 transition-colors rounded-xl hover:bg-red-500/5"
+        >
+          <LogOut className="w-5 h-5" />
+          <span>Sair do Sistema</span>
+        </button>
+      </div>
+    </aside>
+  );
+};
