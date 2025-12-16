@@ -162,6 +162,10 @@ const App: React.FC = () => {
           setPendingAction('open_add_driver');
       } else if (action === 'map') {
           setCurrentView('map');
+      } else if (action === 'view_fleet') {
+          setCurrentView('fleet');
+      } else if (action === 'view_alerts') {
+          setCurrentView('notifications');
       }
   };
 

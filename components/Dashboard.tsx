@@ -190,7 +190,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ vehicles, alerts, onQuickA
         </div>
 
         {/* Card 2 */}
-        <div className="relative overflow-hidden bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-sm group hover:border-slate-700 transition-colors">
+        <div 
+            onClick={() => onQuickAction('view_alerts')}
+            className="relative overflow-hidden bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-sm group hover:border-slate-700 transition-colors cursor-pointer"
+        >
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
              <AlertTriangle className="w-16 h-16 text-yellow-500" />
           </div>
@@ -246,7 +249,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ vehicles, alerts, onQuickA
                 <h2 className="text-lg font-bold text-white">Status da Frota</h2>
                 <p className="text-slate-500 text-xs">Distribuição atual dos veículos</p>
              </div>
-             <button className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors">
+             <button 
+                onClick={() => onQuickAction('view_fleet')}
+                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors"
+             >
                 <ChevronRight className="w-5 h-5" />
              </button>
           </div>
@@ -354,7 +360,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ vehicles, alerts, onQuickA
                       <p className="text-xs text-slate-500">{fuelData.filter(f => f.fuel < 20).length} veículos abaixo de 20%</p>
                   </div>
               </div>
-              <button className="text-xs font-bold text-white bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-700">Ver Lista</button>
+              <button 
+                onClick={() => onQuickAction('view_fleet')}
+                className="text-xs font-bold text-white bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-700"
+              >
+                  Ver Lista
+              </button>
           </div>
         </div>
       </div>
@@ -366,12 +377,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ vehicles, alerts, onQuickA
                 <h2 className="text-lg font-bold text-white">Atividades Recentes</h2>
                 <p className="text-slate-500 text-xs">Feed de eventos em tempo real</p>
             </div>
-            <span className="text-xs font-mono text-slate-500">Live Update <span className="inline-block w-2 h-2 rounded-full bg-green-500 ml-1 animate-pulse"></span></span>
+            <button 
+                onClick={() => onQuickAction('view_alerts')}
+                className="text-xs font-bold text-blue-400 hover:text-blue-300"
+            >
+                Ver Todos
+            </button>
         </div>
         
         <div className="space-y-3">
             {alerts.slice(0, 4).map((alert, idx) => (
-                <div key={alert.id} className="group flex items-center gap-4 p-4 bg-slate-950/50 hover:bg-slate-900 border border-slate-800/50 hover:border-blue-500/30 rounded-2xl transition-all duration-300">
+                <div 
+                    key={alert.id} 
+                    onClick={() => onQuickAction('view_alerts')}
+                    className="group flex items-center gap-4 p-4 bg-slate-950/50 hover:bg-slate-900 border border-slate-800/50 hover:border-blue-500/30 rounded-2xl transition-all duration-300 cursor-pointer"
+                >
                     <div className={`p-3 rounded-xl shrink-0 ${
                          alert.type === AlertType.SPEED ? 'bg-red-500/10 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]' :
                          alert.type === AlertType.MAINTENANCE ? 'bg-yellow-500/10 text-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.2)]' :
