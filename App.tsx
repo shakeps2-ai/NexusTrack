@@ -56,6 +56,24 @@ const App: React.FC = () => {
     setAlerts(prev => [newAlert, ...prev]);
   };
 
+  // --- CHECK SESSION ON MOUNT ---
+  // Verifica se já existe um usuário logado no Supabase ao abrir o app
+  useEffect(() => {
+    const checkSession = async () => {
+        const response = await traccarApi.getCurrentUser();
+        if (response.success && response.user) {
+            setUserProfile(prev => ({ 
+                ...prev, 
+                email: response.user!.email, 
+                name: response.user!.name 
+            }));
+            setIsAuthenticated(true);
+            setShowLanding(false);
+        }
+    };
+    checkSession();
+  }, []);
+
   // --- DATA ENGINE OTIMIZADA ---
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -125,10 +143,12 @@ const App: React.FC = () => {
 
         if (res.success) {
             if (isRegistering) {
+                // Se o registro exigir confirmação de email, avise o usuário
                 setIsRegistering(false);
-                setAuthError("Conta criada! Faça login.");
+                setAuthError("Conta criada! Verifique seu email ou faça login.");
             } else {
                 setIsAuthenticated(true);
+                setShowLanding(false);
                 if (res.user) setUserProfile(prev => ({ ...prev, email: res.user!.email, name: res.user!.name }));
             }
         } else {
@@ -219,7 +239,8 @@ const App: React.FC = () => {
       );
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await traccarApi.logout();
     setIsAuthenticated(false);
     setVehicles([]);
     setShowLogoutConfirm(false);

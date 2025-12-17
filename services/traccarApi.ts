@@ -6,7 +6,7 @@ import { MOCK_VEHICLES } from '../constants';
 export interface AuthResponse {
   success: boolean;
   user?: {
-    id: number;
+    id: string | number;
     name: string;
     email: string;
   };
@@ -26,34 +26,71 @@ class ApiService {
     }
   }
 
-  // Simula login (Mantido local por enquanto, idealmente migraria para Supabase Auth)
-  async login(url: string, email: string, pass: string): Promise<AuthResponse> {
-    // Verifica conexão antes de "logar"
-    const isConnected = await this.checkConnection();
-    if (!isConnected) {
-        return { success: false, error: 'Erro de conexão com o Banco de Dados' };
-    }
-
-    await new Promise(r => setTimeout(r, 800));
+  // Verifica se já existe um usuário logado na sessão (Persistência)
+  async getCurrentUser(): Promise<AuthResponse> {
+    const { data: { session }, error } = await supabase.auth.getSession();
     
-    if (email === 'admin@empresa.com' && pass === '123456') {
-        return { 
-            success: true, 
-            user: { id: 1, name: 'Administrador', email: 'admin@empresa.com' } 
+    if (session?.user) {
+        return {
+            success: true,
+            user: {
+                id: session.user.id,
+                email: session.user.email || '',
+                name: session.user.user_metadata?.full_name || 'Usuário'
+            }
         };
     }
-    if (email.includes('@') && pass.length > 0) {
-         return { 
-            success: true, 
-            user: { id: 99, name: 'Usuário Demo', email: email } 
-        };
-    }
-    return { success: false, error: 'Credenciais inválidas' };
+    return { success: false };
   }
 
+  // Login Real no Supabase
+  async login(url: string, email: string, pass: string): Promise<AuthResponse> {
+    // Tenta login no Supabase Auth
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: pass
+    });
+
+    if (error) {
+        return { success: false, error: 'Email ou senha incorretos.' };
+    }
+
+    if (data.user) {
+        return { 
+            success: true, 
+            user: { 
+                id: data.user.id, 
+                name: data.user.user_metadata?.full_name || 'Usuário', 
+                email: data.user.email || email 
+            } 
+        };
+    }
+
+    return { success: false, error: 'Erro desconhecido ao logar.' };
+  }
+
+  // Registro Real no Supabase
   async register(url: string, name: string, email: string, pass: string): Promise<AuthResponse> {
-      await new Promise(r => setTimeout(r, 800));
+      const { data, error } = await supabase.auth.signUp({
+        email: email,
+        password: pass,
+        options: {
+            data: {
+                full_name: name // Salva o nome nos metadados do usuário
+            }
+        }
+      });
+
+      if (error) {
+          return { success: false, error: error.message };
+      }
+
       return { success: true };
+  }
+
+  // Logout Real
+  async logout(): Promise<void> {
+      await supabase.auth.signOut();
   }
 
   // Busca dispositivos do Supabase
