@@ -40,7 +40,9 @@ export interface Vehicle {
     lat: number;
     lng: number;
   };
-  lastUpdate: string;
+  lastUpdate?: string; 
+  updateInterval?: number;
+  odometer: number; // Quilometragem total em KM
 }
 
 export interface Alert {
@@ -50,6 +52,7 @@ export interface Alert {
   timestamp: string;
   severity: 'low' | 'medium' | 'high';
   resolved: boolean;
+  description?: string; // Mensagem personalizada do alerta
 }
 
 export type ViewState = 'dashboard' | 'map' | 'fleet' | 'employees' | 'analytics' | 'notifications';

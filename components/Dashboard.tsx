@@ -58,7 +58,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ vehicles, alerts, onQuickA
         v.plate,
         v.status,
         v.fuelLevel,
-        v.speed,
+        Math.round(v.speed), // Arredonda velocidade
         `"${v.location.lat}, ${v.location.lng}"`
     ]);
 

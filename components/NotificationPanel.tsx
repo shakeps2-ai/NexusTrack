@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Alert, AlertType } from '../types';
 import { AlertTriangle, Info, CheckCircle, Clock, X, Trash2, ArrowRight } from 'lucide-react';
@@ -7,9 +8,15 @@ interface NotificationPanelProps {
   onClose: () => void;
   alerts: Alert[];
   onViewHistory: () => void;
+  onMarkAllRead: () => void;
+  onClearAll: () => void;
+  onDismiss: (id: string) => void;
 }
 
-export const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose, alerts, onViewHistory }) => {
+export const NotificationPanel: React.FC<NotificationPanelProps> = ({ 
+    isOpen, onClose, alerts, onViewHistory,
+    onMarkAllRead, onClearAll, onDismiss
+}) => {
   if (!isOpen) return null;
 
   const unresolvedAlerts = alerts.filter(a => !a.resolved);
@@ -30,10 +37,20 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, on
                 <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-lg shadow-blue-600/20">{unresolvedAlerts.length}</span>
             </div>
             <div className="flex items-center gap-1">
-                <button className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors" title="Marcar todas como lidas">
+                <button 
+                    onClick={onMarkAllRead}
+                    className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                    title="Marcar todas como lidas"
+                    disabled={unresolvedAlerts.length === 0}
+                >
                     <CheckCircle className="w-4 h-4" />
                 </button>
-                <button className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Limpar tudo">
+                <button 
+                    onClick={onClearAll}
+                    className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                    title="Limpar tudo"
+                    disabled={alerts.length === 0}
+                >
                     <Trash2 className="w-4 h-4" />
                 </button>
             </div>
@@ -59,28 +76,43 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, on
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-white">{alert.type}</p>
-                                    <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">Veículo ID: {alert.vehicleId} reportou um evento de {alert.severity} prioridade.</p>
+                                    <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">
+                                        {alert.description || `Veículo ID: ${alert.vehicleId} reportou um evento de ${alert.severity} prioridade.`}
+                                    </p>
                                     <div className="flex items-center gap-2 mt-2">
                                         <Clock className="w-3 h-3 text-slate-500" />
                                         <span className="text-[10px] text-slate-500">{alert.timestamp}</span>
                                     </div>
                                 </div>
-                                <button className="opacity-0 group-hover:opacity-100 absolute top-2 right-2 p-1 text-slate-500 hover:text-white transition-opacity">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onDismiss(alert.id); }}
+                                    className="opacity-0 group-hover:opacity-100 absolute top-2 right-2 p-1 text-slate-500 hover:text-white hover:bg-slate-800 rounded transition-all"
+                                    title="Remover notificação"
+                                >
                                     <X className="w-3 h-3" />
                                 </button>
                             </div>
                         </div>
                     ))}
                     {resolvedAlerts.map(alert => (
-                         <div key={alert.id} className="p-4 hover:bg-slate-800/30 transition-colors opacity-60 bg-slate-900">
+                         <div key={alert.id} className="p-4 hover:bg-slate-800/30 transition-colors opacity-60 bg-slate-900 group relative">
                             <div className="flex gap-3">
                                 <div className="mt-1 p-2 rounded-lg shrink-0 bg-slate-800 text-slate-500">
                                     <CheckCircle className="w-4 h-4" />
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-slate-300 line-through">{alert.type}</p>
-                                    <p className="text-xs text-slate-500 mt-0.5">Resolvido - Veículo {alert.vehicleId}</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        {alert.description || `Resolvido - Veículo ${alert.vehicleId}`}
+                                    </p>
                                 </div>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); onDismiss(alert.id); }}
+                                    className="opacity-0 group-hover:opacity-100 absolute top-2 right-2 p-1 text-slate-500 hover:text-white hover:bg-slate-800 rounded transition-all"
+                                    title="Remover notificação"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
                             </div>
                          </div>
                     ))}

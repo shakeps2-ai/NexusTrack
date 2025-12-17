@@ -1,3 +1,4 @@
+
 import { Vehicle, VehicleStatus } from '../types';
 import { MOCK_VEHICLES } from '../constants';
 
@@ -52,11 +53,21 @@ class ApiService {
       const existingIndex = this.vehicles.findIndex(v => v.id === vehicle.id);
       
       if (existingIndex >= 0) {
-          // Update
-          this.vehicles[existingIndex] = { ...this.vehicles[existingIndex], ...vehicle };
+          // Update: Mantém dados que não vieram no payload (merge seguro)
+          this.vehicles[existingIndex] = { 
+              ...this.vehicles[existingIndex], 
+              ...vehicle,
+              // Garante que se o status for PARADO, a velocidade zera
+              speed: vehicle.status === VehicleStatus.STOPPED || vehicle.status === VehicleStatus.OFFLINE ? 0 : vehicle.speed
+          };
       } else {
           // Insert
-          this.vehicles.push(vehicle);
+          this.vehicles.push({
+              ...vehicle,
+              odometer: Number(vehicle.odometer) || 0,
+              speed: vehicle.status === VehicleStatus.MOVING ? (vehicle.speed || 30) : 0,
+              location: vehicle.location || { lat: -23.5505, lng: -46.6333 }
+          });
       }
       return true;
   }
@@ -70,7 +81,11 @@ class ApiService {
       const v = this.vehicles.find(v => v.id === id);
       if (v) {
           v.isLocked = !v.isLocked;
-          if (v.isLocked) v.status = VehicleStatus.STOPPED;
+          if (v.isLocked) {
+              v.status = VehicleStatus.STOPPED;
+              v.speed = 0;
+              v.ignition = false;
+          }
           return true;
       }
       return false;
@@ -80,13 +95,34 @@ class ApiService {
   simulateMovement() {
     this.vehicles = this.vehicles.map(v => {
         if (v.status === VehicleStatus.MOVING && !v.isLocked) {
+            // Nova velocidade com variação suave, arredondada para inteiro
+            let variation = (Math.random() * 6 - 3); // Varia entre -3 e +3 km/h
+            let newSpeed = v.speed + variation;
+            
+            // Limites de velocidade (0 a 160 km/h)
+            newSpeed = Math.max(0, Math.min(160, Math.round(newSpeed)));
+            
+            // Se velocidade for muito baixa mas status for movendo, mantém um mínimo ou para
+            if (newSpeed < 5) newSpeed = 10;
+
+            // Calcular distância percorrida no intervalo (assumindo ~2s de intervalo de atualização)
+            // Distância (km) = Velocidade (km/h) * (Tempo (s) / 3600)
+            const distanceTraveledKm = (newSpeed * 2) / 3600;
+
             return {
                 ...v,
-                speed: Math.max(0, Math.min(120, v.speed + (Math.random() * 10 - 5))),
+                speed: Math.round(newSpeed), // Força inteiro
+                odometer: v.odometer + distanceTraveledKm, // Acumula odômetro
                 location: {
-                    lat: v.location.lat + (Math.random() * 0.002 - 0.001),
-                    lng: v.location.lng + (Math.random() * 0.002 - 0.001)
+                    lat: v.location.lat + (Math.random() * 0.001 - 0.0005),
+                    lng: v.location.lng + (Math.random() * 0.001 - 0.0005)
                 }
+            };
+        } else {
+            // Se não está movendo, garante velocidade 0
+            return {
+                ...v,
+                speed: 0
             };
         }
         return v;

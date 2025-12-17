@@ -11,48 +11,51 @@ import { UserProfile } from './components/UserProfile';
 import { NotificationPanel } from './components/NotificationPanel';
 import { NotificationHistory } from './components/NotificationHistory';
 import { LandingPage } from './components/LandingPage';
-import { ViewState, Vehicle, VehicleStatus } from './types'; // Removed unused imports for cleaner code
+import { ViewState, Vehicle, VehicleStatus, Alert, AlertType } from './types';
 import { MOCK_DRIVERS, MOCK_ALERTS } from './constants';
 import { Bell, User, Server, LogIn, Loader2, LogOut, UserPlus, ArrowLeft } from 'lucide-react';
 import { traccarApi } from './services/traccarApi';
 
 const App: React.FC = () => {
-  // Navigation States
+  // Navigation
   const [showLanding, setShowLanding] = useState(true);
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
-  
-  // Action State (Para Deep Linking interno: Ex: Dashboard -> Abrir Modal em Frota)
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   
-  // Data States
+  // Data
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState(MOCK_DRIVERS);
-  const [alerts, setAlerts] = useState(MOCK_ALERTS);
+  const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
 
-  // Auth States
+  // Auth
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   
-  const [loginForm, setLoginForm] = useState({
-      name: '', 
-      email: '',
-      password: ''
-  });
+  const [loginForm, setLoginForm] = useState({ name: '', email: '', password: '' });
+  const [userProfile, setUserProfile] = useState({ name: 'Administrador', email: '', phone: '(11) 99999-9999', company: 'Minha Frota', avatar: '' });
 
-  const [userProfile, setUserProfile] = useState({
-      name: 'Administrador',
-      email: '',
-      phone: '(11) 99999-9999',
-      company: 'Minha Frota'
-  });
-
+  // UI State
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // --- MOCK DATA ENGINE ---
+  // --- HELPER DE NOTIFICAÇÃO ---
+  const createSystemAlert = (vehicleId: string, type: AlertType, severity: 'low' | 'medium' | 'high', resolved: boolean = false, description?: string) => {
+    const newAlert: Alert = {
+        id: `sys-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        vehicleId,
+        type,
+        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        severity,
+        resolved,
+        description
+    };
+    setAlerts(prev => [newAlert, ...prev]);
+  };
+
+  // --- DATA ENGINE OTIMIZADA ---
   useEffect(() => {
     if (!isAuthenticated) return;
     
@@ -60,28 +63,45 @@ const App: React.FC = () => {
         const data = await traccarApi.getDevices();
         if (data && data.length > 0) {
             setVehicles([...data]);
+
+            // Lógica de Detecção Automática de Eventos na Simulação
+            data.forEach(v => {
+                // Regra: Velocidade acima de 100km/h gera alerta
+                if (v.speed > 100) {
+                    setAlerts(prev => {
+                        // Evita spam: só cria se não houver alerta pendente do mesmo tipo para este veículo
+                        const hasPending = prev.some(a => a.vehicleId === v.id && a.type === AlertType.SPEED && !a.resolved);
+                        if (!hasPending) {
+                            return [{
+                                id: `auto-spd-${Date.now()}`,
+                                vehicleId: v.id,
+                                type: AlertType.SPEED,
+                                timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                                severity: 'high',
+                                resolved: false,
+                                description: `Velocidade detectada: ${v.speed} km/h (Limite: 100 km/h)`
+                            }, ...prev];
+                        }
+                        return prev;
+                    });
+                }
+            });
         }
     };
 
     fetchData();
 
-    // Simulação de movimento em tempo real (Mock)
+    // Otimização: Intervalo aumentado para 3000ms para reduzir re-renders desnecessários
     const interval = setInterval(() => {
         traccarApi.simulateMovement();
         fetchData();
-    }, 2000); 
+    }, 3000); 
 
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
   // --- HANDLERS ---
   
-  const handleEnterApp = (registerMode: boolean = false) => {
-      setIsRegistering(registerMode);
-      setShowLanding(false);
-      setAuthError(null);
-  };
-
   const handleAuth = async (e: React.FormEvent) => {
       e.preventDefault();
       setIsConnecting(true);
@@ -98,13 +118,7 @@ const App: React.FC = () => {
                 setAuthError("Conta criada! Faça login.");
             } else {
                 setIsAuthenticated(true);
-                if (res.user) {
-                    setUserProfile(prev => ({ 
-                        ...prev, 
-                        email: res.user.email, 
-                        name: res.user.name 
-                    }));
-                }
+                if (res.user) setUserProfile(prev => ({ ...prev, email: res.user!.email, name: res.user!.name }));
             }
         } else {
             setAuthError(res.error || "Erro de autenticação");
@@ -116,12 +130,28 @@ const App: React.FC = () => {
       }
   };
 
-  // --- CRUD HANDLERS ---
+  // --- NOTIFICATION HANDLERS ---
+  const handleMarkAllRead = () => {
+      setAlerts(prev => prev.map(a => ({ ...a, resolved: true })));
+  };
+
+  const handleClearNotifications = () => {
+      if (confirm('Tem certeza que deseja limpar todo o histórico de notificações?')) {
+          setAlerts([]);
+      }
+  };
+
+  const handleDismissNotification = (id: string) => {
+      setAlerts(prev => prev.filter(a => a.id !== id));
+  };
+
+  // --- CRUD WRAPPERS ---
   const handleAddVehicle = async (newVehicle: Omit<Vehicle, 'id'>) => {
       const tempId = `v-${Date.now()}`;
       const payload = { ...newVehicle, id: tempId };
       await traccarApi.addDevice(payload);
       setVehicles(prev => [...prev, payload as Vehicle]);
+      createSystemAlert(tempId, AlertType.MAINTENANCE, 'low', true, 'Novo veículo adicionado à frota.'); // Log de criação
   };
 
   const handleUpdateVehicle = async (updatedVehicle: Vehicle) => {
@@ -135,15 +165,48 @@ const App: React.FC = () => {
   };
   
   const handleToggleLock = async (id: string) => {
+    // Captura estado antes da mudança para gerar notificação correta
+    const vehicle = vehicles.find(v => v.id === id);
+    if (!vehicle) return;
+    
+    const isLocking = !vehicle.isLocked; // Se não estava bloqueado, a ação é bloquear
+
     await traccarApi.toggleLock(id);
+    
     setVehicles(prev => prev.map(v => v.id === id ? { 
-        ...v, 
-        isLocked: !v.isLocked, 
-        status: !v.isLocked ? VehicleStatus.STOPPED : v.status 
+        ...v, isLocked: !v.isLocked, status: !v.isLocked ? VehicleStatus.STOPPED : v.status 
     } : v));
+
+    // GERA NOTIFICAÇÃO DE AÇÃO COM TEXTO ESPECÍFICO
+    const actionDescription = isLocking 
+        ? `BLOQUEIO ATIVADO: Veículo ${vehicle.plate} foi imobilizado remotamente.` 
+        : `DESBLOQUEIO REALIZADO: Veículo ${vehicle.plate} liberado para operação.`;
+
+    createSystemAlert(
+        id, 
+        AlertType.SOS, // Classifica bloqueio como evento de segurança/SOS
+        isLocking ? 'high' : 'medium',
+        !isLocking, // Se desbloqueou, já nasce resolvido. Se bloqueou, fica pendente atenção.
+        actionDescription
+    );
   };
   
-  const handleUpdateGeofence = (id: string, active: boolean, radius: number) => setVehicles(prev => prev.map(v => v.id === id ? { ...v, geofenceActive: active, geofenceRadius: radius } : v));
+  const handleUpdateGeofence = (id: string, active: boolean, radius: number) => {
+      setVehicles(prev => prev.map(v => v.id === id ? { ...v, geofenceActive: active, geofenceRadius: radius } : v));
+      
+      const desc = active 
+        ? `Cerca Virtual ATIVADA (Raio: ${radius}m)` 
+        : `Cerca Virtual DESATIVADA`;
+
+      // GERA NOTIFICAÇÃO DE CERCA VIRTUAL
+      createSystemAlert(
+          id,
+          AlertType.GEOFENCE,
+          'low',
+          true, // Apenas informativo
+          desc
+      );
+  };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
@@ -152,110 +215,53 @@ const App: React.FC = () => {
     setShowLanding(true);
   };
 
-  // --- QUICK ACTION HANDLER ---
   const handleQuickAction = (action: string) => {
-      if (action === 'add_vehicle') {
-          setCurrentView('fleet');
-          setPendingAction('open_add_vehicle');
-      } else if (action === 'add_driver') {
-          setCurrentView('employees');
-          setPendingAction('open_add_driver');
-      } else if (action === 'map') {
-          setCurrentView('map');
-      } else if (action === 'view_fleet') {
-          setCurrentView('fleet');
-      } else if (action === 'view_alerts') {
-          setCurrentView('notifications');
-      }
+      const actions: Record<string, () => void> = {
+          'add_vehicle': () => { setCurrentView('fleet'); setPendingAction('open_add_vehicle'); },
+          'add_driver': () => { setCurrentView('employees'); setPendingAction('open_add_driver'); },
+          'map': () => setCurrentView('map'),
+          'view_fleet': () => setCurrentView('fleet'),
+          'view_alerts': () => setCurrentView('notifications')
+      };
+      if (actions[action]) actions[action]();
   };
 
-  const consumePendingAction = () => setPendingAction(null);
-
-  // --- RENDER ---
+  // --- RENDER CONTENT ---
   const renderContent = () => {
     switch (currentView) {
-      case 'dashboard': 
-        return <Dashboard vehicles={vehicles} alerts={alerts} onQuickAction={handleQuickAction} />;
-      case 'map': 
-        return <MapTracker vehicles={vehicles} onToggleLock={handleToggleLock} />;
-      case 'fleet': 
-        return (
-            <FleetManager 
-                vehicles={vehicles} 
-                drivers={drivers} 
-                onAddVehicle={handleAddVehicle} 
-                onUpdateVehicle={handleUpdateVehicle} 
-                onDeleteVehicle={handleDeleteVehicle} 
-                onToggleLock={handleToggleLock} 
-                onUpdateGeofence={handleUpdateGeofence}
-                initialAction={pendingAction}
-                onClearAction={consumePendingAction}
-            />
-        );
-      case 'employees': 
-        return (
-            <EmployeeList 
-                drivers={drivers} 
-                vehicles={vehicles} 
-                onAddDriver={(d)=>{setDrivers(p=>[...p,{...d,id:`d${Date.now()}`,rating:5}])}} 
-                onUpdateDriver={(d)=>{setDrivers(p=>p.map(x=>x.id===d.id?d:x))}} 
-                onDeleteDriver={(id)=>{setDrivers(p=>p.filter(x=>x.id!==id))}}
-                initialAction={pendingAction}
-                onClearAction={consumePendingAction}
-            />
-        );
-      case 'analytics': 
-        return <AIAnalyst vehicles={vehicles} drivers={drivers} alerts={alerts} />;
-      case 'notifications': 
-        return <NotificationHistory alerts={alerts} />;
-      default: 
-        return <Dashboard vehicles={vehicles} alerts={alerts} onQuickAction={handleQuickAction} />;
+      case 'dashboard': return <Dashboard vehicles={vehicles} alerts={alerts} onQuickAction={handleQuickAction} />;
+      case 'map': return <MapTracker vehicles={vehicles} onToggleLock={handleToggleLock} />;
+      case 'fleet': return <FleetManager vehicles={vehicles} drivers={drivers} onAddVehicle={handleAddVehicle} onUpdateVehicle={handleUpdateVehicle} onDeleteVehicle={handleDeleteVehicle} onToggleLock={handleToggleLock} onUpdateGeofence={handleUpdateGeofence} initialAction={pendingAction} onClearAction={() => setPendingAction(null)} />;
+      case 'employees': return <EmployeeList drivers={drivers} vehicles={vehicles} onAddDriver={(d)=>{setDrivers(p=>[...p,{...d,id:`d${Date.now()}`,rating:5}])}} onUpdateDriver={(d)=>{setDrivers(p=>p.map(x=>x.id===d.id?d:x))}} onDeleteDriver={(id)=>{setDrivers(p=>p.filter(x=>x.id!==id))}} initialAction={pendingAction} onClearAction={() => setPendingAction(null)} />;
+      case 'analytics': return <AIAnalyst vehicles={vehicles} drivers={drivers} alerts={alerts} />;
+      case 'notifications': return <NotificationHistory alerts={alerts} />;
+      default: return null;
     }
   };
 
-  if (!isAuthenticated && showLanding) {
-    return <LandingPage onEnterApp={handleEnterApp} />;
-  }
+  if (!isAuthenticated && showLanding) return <LandingPage onEnterApp={(reg) => { setIsRegistering(!!reg); setShowLanding(false); setAuthError(null); }} />;
 
   if (!isAuthenticated) {
       return (
           <div className="h-screen overflow-y-auto bg-slate-950 flex items-center justify-center p-4">
               <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-300 my-auto">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
-                  
                   <div className="relative z-10 mb-6">
-                      <button 
-                        onClick={() => setShowLanding(true)}
-                        className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-sm mb-4"
-                      >
-                          <ArrowLeft className="w-4 h-4" />
-                          Voltar ao Site
-                      </button>
+                      <button onClick={() => setShowLanding(true)} className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-sm mb-4"><ArrowLeft className="w-4 h-4" /> Voltar ao Site</button>
                   </div>
-
                   <div className="flex flex-col items-center mb-8 relative z-10">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-900/50 mb-4">
-                          <Server className="w-8 h-8 text-white" />
-                      </div>
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-900/50 mb-4"><Server className="w-8 h-8 text-white" /></div>
                       <h1 className="text-2xl font-bold text-white">NexusTrack <span className="text-blue-500">Premium</span></h1>
                       <p className="text-slate-400 text-sm mt-2">{isRegistering ? 'Crie sua conta empresarial' : 'Plataforma Inteligente de Gestão'}</p>
                   </div>
-
-                  {authError && (
-                      <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm text-center relative z-10">
-                          {authError}
-                      </div>
-                  )}
-
+                  {authError && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm text-center relative z-10">{authError}</div>}
                   <form onSubmit={handleAuth} className="space-y-4 relative z-10">
-                      
                       {isRegistering && (
                           <div className="space-y-1 animate-in slide-in-from-left-2">
                               <label className="text-xs font-bold text-slate-500 uppercase">Nome</label>
                               <input type="text" required={isRegistering} placeholder="Seu nome" value={loginForm.name} onChange={e => setLoginForm({...loginForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
                           </div>
                       )}
-
                       <div className="space-y-1">
                           <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
                           <input type="text" required placeholder="admin@empresa.com" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
@@ -264,16 +270,12 @@ const App: React.FC = () => {
                           <label className="text-xs font-bold text-slate-500 uppercase">Senha</label>
                           <input type="password" required placeholder="••••••••" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
                       </div>
-
                       <button type="submit" disabled={isConnecting} className={`w-full font-bold py-3.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 mt-4 ${isRegistering ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}>
                           {isConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : isRegistering ? <UserPlus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
                           {isConnecting ? 'Acessando...' : (isRegistering ? 'Criar Conta' : 'Entrar na Plataforma')}
                       </button>
-
                       <div className="text-center pt-2">
-                          <button type="button" onClick={() => { setIsRegistering(!isRegistering); setAuthError(null); }} className="text-sm text-slate-500 hover:text-blue-400 transition-colors">
-                              {isRegistering ? "Já tem uma conta? Faça Login" : "Não tem conta? Crie uma grátis"}
-                          </button>
+                          <button type="button" onClick={() => { setIsRegistering(!isRegistering); setAuthError(null); }} className="text-sm text-slate-500 hover:text-blue-400 transition-colors">{isRegistering ? "Já tem uma conta? Faça Login" : "Não tem conta? Crie uma grátis"}</button>
                       </div>
                   </form>
               </div>
@@ -292,10 +294,33 @@ const App: React.FC = () => {
              <span className="text-white font-medium capitalize">{currentView}</span>
            </div>
            <div className="flex items-center gap-4 md:gap-6">
-                <div className="relative"><button onClick={() => { setIsNotificationsOpen(!isNotificationsOpen); setIsProfileOpen(false); }} className="relative text-slate-400 hover:text-white transition-colors p-2"><Bell className="w-5 h-5" /><span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span></button><NotificationPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} alerts={alerts} onViewHistory={() => setCurrentView('notifications')} /></div>
+                <div className="relative">
+                    <button onClick={() => { setIsNotificationsOpen(!isNotificationsOpen); setIsProfileOpen(false); }} className="relative text-slate-400 hover:text-white transition-colors p-2">
+                        <Bell className="w-5 h-5" />
+                        {alerts.filter(a => !a.resolved).length > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
+                    </button>
+                    <NotificationPanel 
+                        isOpen={isNotificationsOpen} 
+                        onClose={() => setIsNotificationsOpen(false)} 
+                        alerts={alerts} 
+                        onViewHistory={() => setCurrentView('notifications')}
+                        onMarkAllRead={handleMarkAllRead}
+                        onClearAll={handleClearNotifications}
+                        onDismiss={handleDismissNotification}
+                    />
+                </div>
                 <div className="flex items-center gap-3 pl-4 md:pl-6 border-l border-slate-800">
                     <div className="text-right hidden sm:block"><p className="text-sm font-medium text-white">{userProfile.name}</p><p className="text-xs text-slate-500">Online</p></div>
-                    <button onClick={() => { setIsProfileOpen(true); setIsNotificationsOpen(false); }} className="w-9 h-9 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700 hover:border-blue-500 transition-colors"><User className="w-5 h-5 text-slate-400" /></button>
+                    <button 
+                        onClick={() => { setIsProfileOpen(true); setIsNotificationsOpen(false); }} 
+                        className="w-9 h-9 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700 hover:border-blue-500 transition-colors overflow-hidden"
+                    >
+                        {userProfile.avatar ? (
+                            <img src={userProfile.avatar} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                            <User className="w-5 h-5 text-slate-400" />
+                        )}
+                    </button>
                 </div>
            </div>
         </header>

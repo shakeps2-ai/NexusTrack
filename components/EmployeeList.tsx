@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Driver, Vehicle } from '../types';
-import { Star, Phone, FileText, Search, Plus, MoreVertical, Edit, Trash2, X, Check, Truck, User, Shield } from 'lucide-react';
+import { Star, Phone, FileText, Search, Plus, MoreVertical, Edit, Trash2, X, Check, Truck, User, Shield, Camera } from 'lucide-react';
 
 interface EmployeeListProps {
   drivers: Driver[];
@@ -25,6 +25,9 @@ export const EmployeeList: React.FC<EmployeeListProps> = ({
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+
+  // File Input Ref for Avatar
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
   const initialFormState = {
@@ -83,6 +86,21 @@ export const EmployeeList: React.FC<EmployeeListProps> = ({
     if (confirm('Tem certeza que deseja remover este motorista?')) {
         onDeleteDriver(id);
     }
+  };
+
+  // Avatar Upload Logic
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const objectUrl = URL.createObjectURL(file);
+          setFormData(prev => ({ ...prev, avatar: objectUrl }));
+      }
+  };
+
+  const getPreviewAvatar = () => {
+      if (formData.avatar) return formData.avatar;
+      const nameForApi = formData.name || 'Novo Motorista';
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(nameForApi)}&background=random&color=fff`;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -252,6 +270,36 @@ export const EmployeeList: React.FC<EmployeeListProps> = ({
                 </div>
                 
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    
+                    {/* AVATAR UPLOAD SECTION */}
+                    <div className="flex flex-col items-center justify-center mb-6">
+                        <div 
+                            className="relative group cursor-pointer"
+                            onClick={() => fileInputRef.current?.click()}
+                            title="Clique para alterar a foto"
+                        >
+                            <div className="w-24 h-24 rounded-full bg-slate-800 border-4 border-slate-900 shadow-xl overflow-hidden relative">
+                                <img 
+                                    src={getPreviewAvatar()} 
+                                    alt="Preview" 
+                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" 
+                                />
+                            </div>
+                            <div className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-[1px]">
+                                <Camera className="w-6 h-6 text-white mb-1" />
+                                <span className="text-[9px] text-white font-bold uppercase tracking-wider">Alterar</span>
+                            </div>
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleFileChange} 
+                                accept="image/*" 
+                                className="hidden" 
+                            />
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">Toque na foto para editar</p>
+                    </div>
+
                     <div className="space-y-1">
                         <label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label>
                         <input 
@@ -299,17 +347,6 @@ export const EmployeeList: React.FC<EmployeeListProps> = ({
                             <option value="active">Ativo (Disponível)</option>
                             <option value="inactive">Inativo (Férias/Licença)</option>
                         </select>
-                    </div>
-
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">URL da Foto (Opcional)</label>
-                        <input 
-                            type="text" 
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 text-sm"
-                            placeholder="https://..."
-                            value={formData.avatar}
-                            onChange={e => setFormData({...formData, avatar: e.target.value})}
-                        />
                     </div>
 
                     <div className="pt-4 flex gap-3">

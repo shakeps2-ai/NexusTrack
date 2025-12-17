@@ -46,7 +46,9 @@ export const MOCK_VEHICLES: Vehicle[] = [
     geofenceActive: true,
     geofenceRadius: 1000,
     location: { lat: 30, lng: 40 },
-    lastUpdate: 'Há 2 min'
+    lastUpdate: 'Há 2 min',
+    updateInterval: 0,
+    odometer: 12450.5
   },
   {
     id: 'v2',
@@ -62,7 +64,9 @@ export const MOCK_VEHICLES: Vehicle[] = [
     geofenceActive: false,
     geofenceRadius: 500,
     location: { lat: 60, lng: 20 },
-    lastUpdate: 'Há 15 min'
+    lastUpdate: 'Há 15 min',
+    updateInterval: 60,
+    odometer: 85300.2
   },
   {
     id: 'v3',
@@ -77,7 +81,9 @@ export const MOCK_VEHICLES: Vehicle[] = [
     geofenceActive: true,
     geofenceRadius: 5000,
     location: { lat: 80, lng: 80 },
-    lastUpdate: 'Há 4 horas'
+    lastUpdate: 'Há 4 horas',
+    updateInterval: 300,
+    odometer: 210450.0
   },
   {
     id: 'v4',
@@ -93,7 +99,9 @@ export const MOCK_VEHICLES: Vehicle[] = [
     geofenceActive: false,
     geofenceRadius: 2000,
     location: { lat: 20, lng: 70 },
-    lastUpdate: 'Há 1 min'
+    lastUpdate: 'Há 1 min',
+    updateInterval: 0,
+    odometer: 45200.8
   }
 ];
 
