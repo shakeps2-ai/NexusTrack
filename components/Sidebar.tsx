@@ -1,14 +1,16 @@
+
 import React from 'react';
 import { ViewState } from '../types';
-import { LayoutDashboard, Map, Truck, Users, Activity, LogOut } from 'lucide-react';
+import { LayoutDashboard, Map, Truck, Users, Activity, LogOut, Database, Wifi } from 'lucide-react';
 
 interface SidebarProps {
   currentView: ViewState;
   onChangeView: (view: ViewState) => void;
   onLogout: () => void;
+  connectionStatus?: 'connected' | 'disconnected' | 'checking';
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onLogout, connectionStatus = 'connected' }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
     { id: 'map', label: 'Monitoramento', icon: Map },
@@ -51,6 +53,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onL
           );
         })}
       </nav>
+
+      {/* Connection Status Indicator */}
+      <div className="px-6 py-4">
+          <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${
+              connectionStatus === 'connected' 
+              ? 'bg-green-900/10 border-green-500/20 text-green-400' 
+              : connectionStatus === 'checking'
+              ? 'bg-yellow-900/10 border-yellow-500/20 text-yellow-400'
+              : 'bg-red-900/10 border-red-500/20 text-red-400'
+          }`}>
+              <div className="relative">
+                  <div className={`w-2 h-2 rounded-full ${
+                      connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'checking' ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}></div>
+                  {connectionStatus === 'connected' && <div className="absolute inset-0 w-2 h-2 rounded-full bg-green-500 animate-ping opacity-75"></div>}
+              </div>
+              <span>
+                  {connectionStatus === 'connected' ? 'Banco de Dados: Online' : connectionStatus === 'checking' ? 'Verificando...' : 'Offline'}
+              </span>
+          </div>
+      </div>
 
       <div className="p-4 border-t border-slate-900">
         <button 

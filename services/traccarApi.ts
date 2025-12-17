@@ -16,8 +16,24 @@ export interface AuthResponse {
 // Serviço Real conectado ao Supabase
 class ApiService {
   
+  // Verifica se a conexão com o banco de dados está ativa
+  async checkConnection(): Promise<boolean> {
+    try {
+      const { count, error } = await supabase.from('vehicles').select('*', { count: 'exact', head: true });
+      return !error;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Simula login (Mantido local por enquanto, idealmente migraria para Supabase Auth)
   async login(url: string, email: string, pass: string): Promise<AuthResponse> {
+    // Verifica conexão antes de "logar"
+    const isConnected = await this.checkConnection();
+    if (!isConnected) {
+        return { success: false, error: 'Erro de conexão com o Banco de Dados' };
+    }
+
     await new Promise(r => setTimeout(r, 800));
     
     if (email === 'admin@empresa.com' && pass === '123456') {
@@ -97,7 +113,7 @@ class ApiService {
         geofence_active: v.geofenceActive,
         geofence_radius: v.geofenceRadius,
         location: v.location,
-        last_update: v.lastUpdate,
+        last_update: new Date().toLocaleString('pt-BR'),
         update_interval: v.updateInterval,
         odometer: v.odometer
      }));
@@ -121,7 +137,7 @@ class ApiService {
         geofence_active: vehicle.geofenceActive,
         geofence_radius: vehicle.geofenceRadius,
         location: vehicle.location,
-        last_update: vehicle.lastUpdate,
+        last_update: new Date().toLocaleString('pt-BR'),
         update_interval: vehicle.updateInterval,
         odometer: vehicle.odometer
       };
@@ -184,7 +200,7 @@ class ApiService {
                 speed: newSpeed,
                 odometer: newOdometer,
                 location: newLocation,
-                last_update: 'Agora'
+                last_update: new Date().toLocaleString('pt-BR')
             };
         });
 

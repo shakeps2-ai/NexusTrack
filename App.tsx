@@ -27,11 +27,12 @@ const App: React.FC = () => {
   const [drivers, setDrivers] = useState(MOCK_DRIVERS);
   const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
 
-  // Auth
+  // Auth & Connection
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   
   const [loginForm, setLoginForm] = useState({ name: '', email: '', password: '' });
   const [userProfile, setUserProfile] = useState({ name: 'Administrador', email: '', phone: '(11) 99999-9999', company: 'Minha Frota', avatar: '' });
@@ -60,38 +61,48 @@ const App: React.FC = () => {
     if (!isAuthenticated) return;
     
     const fetchData = async () => {
-        const data = await traccarApi.getDevices();
-        if (data && data.length > 0) {
-            setVehicles([...data]);
+        try {
+            const isConnected = await traccarApi.checkConnection();
+            setConnectionStatus(isConnected ? 'connected' : 'disconnected');
 
-            // Lógica de Detecção Automática de Eventos na Simulação
-            data.forEach(v => {
-                // Regra: Velocidade acima de 100km/h gera alerta
-                if (v.speed > 100) {
-                    setAlerts(prev => {
-                        // Evita spam: só cria se não houver alerta pendente do mesmo tipo para este veículo
-                        const hasPending = prev.some(a => a.vehicleId === v.id && a.type === AlertType.SPEED && !a.resolved);
-                        if (!hasPending) {
-                            return [{
-                                id: `auto-spd-${Date.now()}`,
-                                vehicleId: v.id,
-                                type: AlertType.SPEED,
-                                timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                                severity: 'high',
-                                resolved: false,
-                                description: `Velocidade detectada: ${v.speed} km/h (Limite: 100 km/h)`
-                            }, ...prev];
+            if (isConnected) {
+                const data = await traccarApi.getDevices();
+                if (data && data.length > 0) {
+                    setVehicles([...data]);
+
+                    // Lógica de Detecção Automática de Eventos na Simulação
+                    data.forEach(v => {
+                        // Regra: Velocidade acima de 100km/h gera alerta
+                        if (v.speed > 100) {
+                            setAlerts(prev => {
+                                // Evita spam: só cria se não houver alerta pendente do mesmo tipo para este veículo
+                                const hasPending = prev.some(a => a.vehicleId === v.id && a.type === AlertType.SPEED && !a.resolved);
+                                if (!hasPending) {
+                                    return [{
+                                        id: `auto-spd-${Date.now()}`,
+                                        vehicleId: v.id,
+                                        type: AlertType.SPEED,
+                                        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                                        severity: 'high',
+                                        resolved: false,
+                                        description: `Velocidade detectada: ${v.speed} km/h (Limite: 100 km/h)`
+                                    }, ...prev];
+                                }
+                                return prev;
+                            });
                         }
-                        return prev;
                     });
                 }
-            });
+            }
+        } catch (e) {
+            setConnectionStatus('disconnected');
         }
     };
 
+    // Initial fetch
     fetchData();
 
-    // Otimização: Intervalo aumentado para 3000ms para reduzir re-renders desnecessários
+    // Loop de atualização (Simula Websocket)
     const interval = setInterval(() => {
         traccarApi.simulateMovement();
         fetchData();
@@ -285,7 +296,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans selection:bg-blue-500/30">
-      <Sidebar currentView={currentView} onChangeView={setCurrentView} onLogout={() => setShowLogoutConfirm(true)} />
+      <Sidebar currentView={currentView} onChangeView={setCurrentView} onLogout={() => setShowLogoutConfirm(true)} connectionStatus={connectionStatus} />
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         <header className="h-16 border-b border-slate-800 bg-slate-950/80 backdrop-blur z-10 flex items-center justify-between px-4 md:px-8 relative">
            <div className="flex items-center text-slate-400 text-sm">
