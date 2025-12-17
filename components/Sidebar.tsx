@@ -1,7 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ViewState } from '../types';
-import { LayoutDashboard, Map, Truck, Users, Activity, LogOut, Database, Wifi } from 'lucide-react';
+import { LayoutDashboard, Map, Truck, Users, Activity, LogOut, Database, Wifi, ToggleLeft, ToggleRight } from 'lucide-react';
+import { traccarApi } from '../services/traccarApi';
 
 interface SidebarProps {
   currentView: ViewState;
@@ -11,6 +12,14 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onLogout, connectionStatus = 'connected' }) => {
+  const [isSimulation, setIsSimulation] = useState(traccarApi.getSimulationMode());
+
+  const toggleSimulation = () => {
+      const newState = !isSimulation;
+      setIsSimulation(newState);
+      traccarApi.setSimulationMode(newState);
+  };
+
   const menuItems = [
     { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
     { id: 'map', label: 'Monitoramento', icon: Map },
@@ -53,6 +62,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onL
           );
         })}
       </nav>
+
+      {/* Mode Toggle */}
+      <div className="px-6 pb-2">
+          <div className="bg-slate-900 rounded-xl p-3 border border-slate-800">
+              <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase">Fonte de Dados</span>
+                  <button onClick={toggleSimulation} className="text-blue-500 hover:text-blue-400 transition-colors">
+                      {isSimulation ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6 text-slate-600" />}
+                  </button>
+              </div>
+              <p className={`text-xs font-medium ${isSimulation ? 'text-yellow-500' : 'text-green-500'}`}>
+                  {isSimulation ? 'Simulação Ativa' : 'Dados Reais (API)'}
+              </p>
+          </div>
+      </div>
 
       {/* Connection Status Indicator */}
       <div className="px-6 py-4">

@@ -5,7 +5,7 @@ import {
     Search, Plus, Battery, Signal, X, Wrench, Calendar, User, MapPin, 
     Edit, Trash2, CheckCircle, Radio, Lock, Unlock, Shield, 
     Loader2, Gauge, Clock, Activity, Navigation,
-    Wifi, Key, Siren, MousePointer2, AlertOctagon, Copy, History, Truck, Link as LinkIcon, Server, RefreshCw
+    Wifi, Key, Siren, MousePointer2, AlertOctagon, Copy, History, Truck, Link as LinkIcon, Server, RefreshCw, Code
 } from 'lucide-react';
 import { traccarApi } from '../services/traccarApi';
 
@@ -71,6 +71,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
   // Form States
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [connectTab, setConnectTab] = useState<'status' | 'api'>('status'); // Abas do modal de conexão
   const [connectVehicle, setConnectVehicle] = useState<Vehicle | null>(null);
   
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -148,6 +149,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
   const handleOpenConnect = (vehicle: Vehicle, e: React.MouseEvent) => {
       e.stopPropagation();
       setConnectVehicle(vehicle);
+      setConnectTab('status');
       setIsConnectModalOpen(true);
   };
 
@@ -419,42 +421,90 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
       {/* --- CONNECT/INTEGRATION MODAL --- */}
       {isConnectModalOpen && connectVehicle && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 p-4" onClick={() => setIsConnectModalOpen(false)}>
-              <div className="bg-slate-950 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-slate-950 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                   <div className="p-5 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
                       <h2 className="text-lg font-bold text-white flex items-center gap-2"><LinkIcon className="w-5 h-5 text-green-500" /> Configuração do Rastreador</h2>
                       <button onClick={() => setIsConnectModalOpen(false)} className="text-slate-500 hover:text-white"><X className="w-5 h-5" /></button>
                   </div>
-                  <div className="p-6 space-y-4">
-                      <div className="bg-blue-900/10 border border-blue-500/20 rounded-xl p-4">
-                          <p className="text-sm text-blue-200 mb-2 font-medium">Instruções para App/Rastreador:</p>
-                          <div className="space-y-2 text-xs font-mono text-slate-300">
-                              <div className="flex justify-between border-b border-blue-500/10 pb-1"><span>Protocolo:</span><span className="text-white">Traccar / Osmin</span></div>
-                              <div className="flex justify-between border-b border-blue-500/10 pb-1"><span>IP do Servidor:</span><span className="text-white">tracker.nexustrack.com</span></div>
-                              <div className="flex justify-between border-b border-blue-500/10 pb-1"><span>Porta:</span><span className="text-white">5055 (Padrão)</span></div>
-                              <div className="flex justify-between pt-1"><span>ID do Dispositivo:</span><span className="text-green-400 font-bold">{connectVehicle.trackerId || 'Não definido'}</span></div>
-                          </div>
-                      </div>
+                  
+                  {/* Tabs */}
+                  <div className="flex border-b border-slate-800 px-6 pt-4 gap-4">
+                      <button onClick={() => setConnectTab('status')} className={`pb-3 text-sm font-bold border-b-2 transition-colors ${connectTab === 'status' ? 'text-white border-blue-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>Status & Teste</button>
+                      <button onClick={() => setConnectTab('api')} className={`pb-3 text-sm font-bold border-b-2 transition-colors ${connectTab === 'api' ? 'text-white border-blue-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}>API de Ingestão</button>
+                  </div>
 
-                      <div className="text-center space-y-3 pt-2">
-                          <p className="text-slate-400 text-xs">Como estamos em ambiente Serverless (Demo), o servidor acima é ilustrativo. Utilize o botão abaixo para simular o recebimento de dados deste dispositivo.</p>
-                          
-                          <button 
-                              onClick={handleTestPing} 
-                              disabled={testingPing}
-                              className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-600/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                              {testingPing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                              {testingPing ? 'Enviando...' : 'Enviar Ping de Teste'}
-                          </button>
-                          
-                          <p className="text-[10px] text-slate-500">Isso atualizará a localização e o status para "Em Movimento".</p>
-                      </div>
+                  <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
+                      {connectTab === 'status' && (
+                          <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
+                             <div className="bg-blue-900/10 border border-blue-500/20 rounded-xl p-4">
+                                  <p className="text-sm text-blue-200 mb-2 font-medium">Instruções para App/Rastreador:</p>
+                                  <div className="space-y-2 text-xs font-mono text-slate-300">
+                                      <div className="flex justify-between border-b border-blue-500/10 pb-1"><span>Protocolo:</span><span className="text-white">Traccar / Osmin</span></div>
+                                      <div className="flex justify-between border-b border-blue-500/10 pb-1"><span>IP do Servidor:</span><span className="text-white">tracker.nexustrack.com</span></div>
+                                      <div className="flex justify-between border-b border-blue-500/10 pb-1"><span>Porta:</span><span className="text-white">5055 (Padrão)</span></div>
+                                      <div className="flex justify-between pt-1"><span>ID do Dispositivo:</span><span className="text-green-400 font-bold">{connectVehicle.trackerId || 'Não definido'}</span></div>
+                                  </div>
+                              </div>
+
+                              <div className="text-center space-y-3 pt-2">
+                                  <p className="text-slate-400 text-xs">Utilize o botão abaixo para simular o recebimento de dados deste dispositivo ou configure a ingestão real na aba "API de Ingestão".</p>
+                                  
+                                  <button 
+                                      onClick={handleTestPing} 
+                                      disabled={testingPing}
+                                      className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-600/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                      {testingPing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                      {testingPing ? 'Enviando...' : 'Enviar Ping de Teste'}
+                                  </button>
+                                  
+                                  <p className="text-[10px] text-slate-500">Isso atualizará a localização e o status para "Em Movimento".</p>
+                              </div>
+                          </div>
+                      )}
+
+                      {connectTab === 'api' && (
+                          <div className="space-y-4 animate-in fade-in slide-in-from-right-2">
+                              <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                                  <p className="text-sm font-bold text-white mb-2 flex items-center gap-2"><Code className="w-4 h-4 text-purple-500" /> Webhook para Dados Reais</p>
+                                  <p className="text-xs text-slate-400 mb-4">
+                                      Se você possui um rastreador real ou servidor Traccar, configure um webhook ou script para enviar dados para o Supabase:
+                                  </p>
+                                  
+                                  <div className="space-y-3">
+                                      <div>
+                                          <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Tabela Supabase:</p>
+                                          <code className="block bg-black p-2 rounded text-green-400 text-xs font-mono border border-slate-800">
+                                              vehicles (upsert)
+                                          </code>
+                                      </div>
+                                      <div>
+                                          <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Exemplo de Payload JSON:</p>
+                                          <pre className="block bg-black p-2 rounded text-blue-300 text-[10px] font-mono border border-slate-800 overflow-x-auto">
+{`{
+  "id": "${connectVehicle.id}",
+  "location": { "lat": -23.55, "lng": -46.63 },
+  "speed": 45,
+  "status": "Em Movimento",
+  "last_update": "2024-05-20T10:00:00Z"
+}`}
+                                          </pre>
+                                      </div>
+                                  </div>
+                              </div>
+                              <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                                  <p className="text-xs text-yellow-500">
+                                      <strong>Dica:</strong> Para ver dados reais fluindo, certifique-se de <strong>desativar o Modo Simulação</strong> no menu lateral.
+                                  </p>
+                              </div>
+                          </div>
+                      )}
                   </div>
               </div>
           </div>
       )}
 
-      {/* --- PREMIUM DETAILS MODAL --- */}
+      {/* ... (Premium Details Modal mantido igual) ... */}
       {selectedVehicle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-slate-950 border border-slate-800 w-full max-w-5xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 relative" onClick={(e) => e.stopPropagation()}>

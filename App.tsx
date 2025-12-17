@@ -74,59 +74,83 @@ const App: React.FC = () => {
     checkSession();
   }, []);
 
-  // --- DATA ENGINE OTIMIZADA ---
+  // --- DATA ENGINE PREMIUM (REALTIME) ---
   useEffect(() => {
     if (!isAuthenticated) return;
     
-    const fetchData = async () => {
+    // 1. Carga Inicial
+    const loadInitialData = async () => {
         try {
             const isConnected = await traccarApi.checkConnection();
             setConnectionStatus(isConnected ? 'connected' : 'disconnected');
 
             if (isConnected) {
                 const data = await traccarApi.getDevices();
-                if (data && data.length > 0) {
-                    setVehicles([...data]);
-
-                    // Lógica de Detecção Automática de Eventos na Simulação
-                    data.forEach(v => {
-                        // Regra: Velocidade acima de 100km/h gera alerta
-                        if (v.speed > 100) {
-                            setAlerts(prev => {
-                                // Evita spam: só cria se não houver alerta pendente do mesmo tipo para este veículo
-                                const hasPending = prev.some(a => a.vehicleId === v.id && a.type === AlertType.SPEED && !a.resolved);
-                                if (!hasPending) {
-                                    return [{
-                                        id: `auto-spd-${Date.now()}`,
-                                        vehicleId: v.id,
-                                        type: AlertType.SPEED,
-                                        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                                        severity: 'high',
-                                        resolved: false,
-                                        description: `Velocidade detectada: ${v.speed} km/h (Limite: 100 km/h)`
-                                    }, ...prev];
-                                }
-                                return prev;
-                            });
-                        }
-                    });
-                }
+                if (data) setVehicles(data);
             }
         } catch (e) {
             setConnectionStatus('disconnected');
         }
     };
+    loadInitialData();
 
-    // Initial fetch
-    fetchData();
+    // 2. Inscrição em Tempo Real (Websocket)
+    // Ouve mudanças diretamente do banco de dados (Insert/Update/Delete)
+    const subscription = traccarApi.subscribeToUpdates((payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            if (payload.new) {
+                setVehicles(prev => {
+                    const index = prev.findIndex(v => v.id === payload.new!.id);
+                    if (index >= 0) {
+                        // Update eficiente
+                        const newArr = [...prev];
+                        newArr[index] = payload.new!;
+                        return newArr;
+                    } else {
+                        // Insert
+                        return [...prev, payload.new!];
+                    }
+                });
 
-    // Loop de atualização (Simula Websocket)
+                // Verificação de Alertas em Tempo Real
+                const v = payload.new;
+                if (v.speed > 100) {
+                    setAlerts(prev => {
+                        const hasPending = prev.some(a => a.vehicleId === v.id && a.type === AlertType.SPEED && !a.resolved);
+                        if (!hasPending) {
+                            return [{
+                                id: `rt-spd-${Date.now()}`,
+                                vehicleId: v.id,
+                                type: AlertType.SPEED,
+                                timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                                severity: 'high',
+                                resolved: false,
+                                description: `Velocidade detectada: ${v.speed} km/h (Limite: 100 km/h)`
+                            }, ...prev];
+                        }
+                        return prev;
+                    });
+                }
+            }
+        } else if (payload.eventType === 'DELETE') {
+            if (payload.old?.id) {
+                setVehicles(prev => prev.filter(v => v.id !== payload.old!.id));
+            }
+        }
+    });
+
+    // 3. Loop de Simulação (Escrita Apenas)
+    // Se o modo simulação estiver ativo, gera dados e escreve no banco.
+    // O banco dispara o evento Realtime, que atualiza a UI acima.
+    // Isso garante que o fluxo seja sempre DB -> UI, mesmo na simulação.
     const interval = setInterval(() => {
         traccarApi.simulateMovement();
-        fetchData();
     }, 3000); 
 
-    return () => clearInterval(interval);
+    return () => {
+        subscription.unsubscribe();
+        clearInterval(interval);
+    };
   }, [isAuthenticated]);
 
   // --- HANDLERS ---
@@ -181,18 +205,18 @@ const App: React.FC = () => {
       const tempId = `v-${Date.now()}`;
       const payload = { ...newVehicle, id: tempId };
       await traccarApi.addDevice(payload);
-      setVehicles(prev => [...prev, payload as Vehicle]);
+      // setVehicles removido daqui, pois o Realtime atualizará a UI automaticamente
       createSystemAlert(tempId, AlertType.MAINTENANCE, 'low', true, 'Novo veículo adicionado à frota.'); // Log de criação
   };
 
   const handleUpdateVehicle = async (updatedVehicle: Vehicle) => {
       await traccarApi.addDevice(updatedVehicle);
-      setVehicles(prev => prev.map(v => v.id === updatedVehicle.id ? updatedVehicle : v));
+      // setVehicles removido, realtime cuida disso
   };
 
   const handleDeleteVehicle = async (id: string) => {
       await traccarApi.deleteDevice(id);
-      setVehicles(prev => prev.filter(v => v.id !== id));
+      // setVehicles removido, realtime cuida disso
   };
   
   const handleToggleLock = async (id: string) => {
@@ -203,11 +227,8 @@ const App: React.FC = () => {
     const isLocking = !vehicle.isLocked; // Se não estava bloqueado, a ação é bloquear
 
     await traccarApi.toggleLock(id);
+    // UI será atualizada pelo Realtime, mas a notificação é gerada aqui para feedback imediato
     
-    setVehicles(prev => prev.map(v => v.id === id ? { 
-        ...v, isLocked: !v.isLocked, status: !v.isLocked ? VehicleStatus.STOPPED : v.status 
-    } : v));
-
     // GERA NOTIFICAÇÃO DE AÇÃO COM TEXTO ESPECÍFICO
     const actionDescription = isLocking 
         ? `BLOQUEIO ATIVADO: Veículo ${vehicle.plate} foi imobilizado remotamente.` 
