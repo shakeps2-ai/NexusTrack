@@ -5,8 +5,9 @@ import {
     Search, Plus, Battery, Signal, X, Wrench, Calendar, User, MapPin, 
     Edit, Trash2, CheckCircle, Radio, Lock, Unlock, Shield, 
     Loader2, Gauge, Clock, Activity, Navigation,
-    Wifi, Key, Siren, MousePointer2, AlertOctagon, Copy, History, Truck
+    Wifi, Key, Siren, MousePointer2, AlertOctagon, Copy, History, Truck, Link as LinkIcon, Server, RefreshCw
 } from 'lucide-react';
+import { traccarApi } from '../services/traccarApi';
 
 interface FleetManagerProps {
   vehicles: Vehicle[];
@@ -69,6 +70,9 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
 
   // Form States
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [connectVehicle, setConnectVehicle] = useState<Vehicle | null>(null);
+  
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [formData, setFormData] = useState({
     plate: '',
@@ -97,6 +101,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
   });
   const [showMaintenanceForm, setShowMaintenanceForm] = useState(false);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [testingPing, setTestingPing] = useState(false);
 
   // --- EFFECTS ---
   useEffect(() => {
@@ -138,6 +143,27 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
         odometer: Math.floor(vehicle.odometer)
     });
     setIsFormOpen(true);
+  };
+
+  const handleOpenConnect = (vehicle: Vehicle, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setConnectVehicle(vehicle);
+      setIsConnectModalOpen(true);
+  };
+
+  const handleTestPing = async () => {
+      if (!connectVehicle) return;
+      setTestingPing(true);
+      
+      const success = await traccarApi.sendTestPing(connectVehicle.id);
+      
+      setTestingPing(false);
+      if (success) {
+          setToast({ msg: 'Ping recebido! Localização atualizada.', type: 'success' });
+          setIsConnectModalOpen(false);
+      } else {
+          setToast({ msg: 'Falha ao enviar ping de teste.', type: 'alert' });
+      }
   };
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
@@ -255,11 +281,9 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
       return maintenanceHistory.filter(m => m.vehicleId === selectedVehicle.id || m.vehicleId === 'all');
   }, [selectedVehicle, maintenanceHistory]);
 
-  // JSX simplificado para brevidade onde não houve mudança, focado na área de Manutenção
   return (
     <div className="p-4 md:p-8 h-full overflow-y-auto animate-fade-in pb-24 md:pb-8 relative">
       
-      {/* ... (Header e Tabela mantidos iguais ao arquivo anterior) ... */}
       {/* Toast Notification */}
       {toast && (
           <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] animate-in slide-in-from-top-5 fade-in duration-300">
@@ -347,6 +371,7 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
                       </td>
                       <td className="px-6 py-4 text-right md:table-cell pt-4 md:pt-4 border-t border-slate-800/50 md:border-0">
                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={(e) => handleOpenConnect(vehicle, e)} className="p-2 bg-slate-800 hover:bg-green-600 text-slate-400 hover:text-white rounded-lg transition-colors" title="Conectar/Testar"><LinkIcon className="w-4 h-4" /></button>
                             <button onClick={(e) => handleOpenEdit(vehicle, e)} className="p-2 bg-slate-800 hover:bg-blue-600 text-slate-400 hover:text-white rounded-lg transition-colors" title="Editar"><Edit className="w-4 h-4" /></button>
                             <button onClick={(e) => handleDelete(vehicle.id, e)} className="p-2 bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white rounded-lg transition-colors" title="Excluir"><Trash2 className="w-4 h-4" /></button>
                          </div>
@@ -389,6 +414,44 @@ export const FleetManager: React.FC<FleetManagerProps> = ({
                 </div>
             </div>
          </div>
+      )}
+
+      {/* --- CONNECT/INTEGRATION MODAL --- */}
+      {isConnectModalOpen && connectVehicle && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 p-4" onClick={() => setIsConnectModalOpen(false)}>
+              <div className="bg-slate-950 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col" onClick={(e) => e.stopPropagation()}>
+                  <div className="p-5 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2"><LinkIcon className="w-5 h-5 text-green-500" /> Configuração do Rastreador</h2>
+                      <button onClick={() => setIsConnectModalOpen(false)} className="text-slate-500 hover:text-white"><X className="w-5 h-5" /></button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                      <div className="bg-blue-900/10 border border-blue-500/20 rounded-xl p-4">
+                          <p className="text-sm text-blue-200 mb-2 font-medium">Instruções para App/Rastreador:</p>
+                          <div className="space-y-2 text-xs font-mono text-slate-300">
+                              <div className="flex justify-between border-b border-blue-500/10 pb-1"><span>Protocolo:</span><span className="text-white">Traccar / Osmin</span></div>
+                              <div className="flex justify-between border-b border-blue-500/10 pb-1"><span>IP do Servidor:</span><span className="text-white">tracker.nexustrack.com</span></div>
+                              <div className="flex justify-between border-b border-blue-500/10 pb-1"><span>Porta:</span><span className="text-white">5055 (Padrão)</span></div>
+                              <div className="flex justify-between pt-1"><span>ID do Dispositivo:</span><span className="text-green-400 font-bold">{connectVehicle.trackerId || 'Não definido'}</span></div>
+                          </div>
+                      </div>
+
+                      <div className="text-center space-y-3 pt-2">
+                          <p className="text-slate-400 text-xs">Como estamos em ambiente Serverless (Demo), o servidor acima é ilustrativo. Utilize o botão abaixo para simular o recebimento de dados deste dispositivo.</p>
+                          
+                          <button 
+                              onClick={handleTestPing} 
+                              disabled={testingPing}
+                              className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-600/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                              {testingPing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                              {testingPing ? 'Enviando...' : 'Enviar Ping de Teste'}
+                          </button>
+                          
+                          <p className="text-[10px] text-slate-500">Isso atualizará a localização e o status para "Em Movimento".</p>
+                      </div>
+                  </div>
+              </div>
+          </div>
       )}
 
       {/* --- PREMIUM DETAILS MODAL --- */}

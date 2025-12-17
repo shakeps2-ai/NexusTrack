@@ -208,6 +208,26 @@ class ApiService {
       return false;
   }
 
+  // TESTE: Simula um ping recebido de um rastreador (atualiza hora e move levemente)
+  async sendTestPing(id: string): Promise<boolean> {
+      const { data: vehicle } = await supabase.from('vehicles').select('*').eq('id', id).single();
+      if (!vehicle) return false;
+
+      // Move ligeiramente para mostrar atividade no mapa
+      const newLat = (vehicle.location?.lat || -23.55) + (Math.random() * 0.0005 - 0.00025);
+      const newLng = (vehicle.location?.lng || -46.63) + (Math.random() * 0.0005 - 0.00025);
+
+      const updates = {
+          last_update: 'Agora (Teste)', // Mostra visualmente que foi atualizado
+          location: { lat: newLat, lng: newLng },
+          status: vehicle.is_locked ? VehicleStatus.STOPPED : VehicleStatus.MOVING, // Força status online
+          speed: vehicle.is_locked ? 0 : Math.max(10, Math.random() * 60)
+      };
+
+      const { error } = await supabase.from('vehicles').update(updates).eq('id', id);
+      return !error;
+  }
+
   // Simulação: Calcula novas posições no frontend e SALVA no banco
   // Isso permite que múltiplos clientes vendo o painel vejam o movimento em tempo real
   async simulateMovement() {
