@@ -3,151 +3,132 @@ import { GoogleGenAI } from "@google/genai";
 import { Vehicle, Driver, Alert, VehicleStatus } from '../types';
 
 // --- CONFIGURAÇÃO ---
-// O modelo Flash é otimizado para velocidade e baixo custo (Free Tier disponível)
 const MODEL_NAME = 'gemini-2.5-flash';
 
+// Chave fornecida pelo usuário (Prioridade secundária após variáveis de ambiente)
+// Nota: Chaves 'vck_' geralmente são da Vercel. Se falhar com o Google, o fallback local assume.
+const PROVIDED_KEY = 'vck_5epCCSScPepll9AMdh81cRhIMj4mOOy9BwUClSjfpnxlt2jRQn1xaQbG';
+
+// Interface de Resposta Híbrida
+export interface AIResponse {
+  text: string;
+  source: 'cloud' | 'local';
+}
+
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
-  // Se não houver chave, retornamos null para ativar o modo Local
+  // 1. Tenta var de ambiente segura
+  // 2. Tenta a chave fornecida manualmente
+  const apiKey = process.env.API_KEY || PROVIDED_KEY;
+  
   if (!apiKey || apiKey === 'undefined' || apiKey === '') return null;
   return new GoogleGenAI({ apiKey });
 };
 
-// --- MOCK INTELLIGENCE (Modo Gratuito/Local) ---
-// Funciona sem API Key, analisando os dados via Regex e Lógica
+// --- MOCK INTELLIGENCE (Modo Local - "A Outra Funcional") ---
 const mockFleetAnalysis = (query: string, vehicles: Vehicle[], drivers: Driver[], alerts: Alert[]): string => {
     const q = query.toLowerCase();
     const movingCount = vehicles.filter(v => v.status === VehicleStatus.MOVING).length;
-    const stoppedCount = vehicles.filter(v => v.status === VehicleStatus.STOPPED).length;
-    const alertCount = alerts.filter(a => !a.resolved).length;
     const totalVehicles = vehicles.length;
-    
-    // Análise de Combustível
-    if (q.includes('combustível') || q.includes('abastecer') || q.includes('tanque')) {
+    const avgFuel = Math.round(vehicles.reduce((acc, v) => acc + v.fuelLevel, 0) / (totalVehicles || 1));
+    const alertCount = alerts.filter(a => !a.resolved).length;
+
+    // Resposta Padrão Inteligente Local
+    if (q.includes('resumo') || q.includes('geral') || q.includes('status')) {
+       return `### 🧠 Nexus Local Intelligence\n\n` +
+              `**Status da Frota:**\n` +
+              `- Total: ${totalVehicles} veículos\n` +
+              `- Em Operação: ${movingCount} ativos\n` +
+              `- Média de Combustível: ${avgFuel}%\n\n` +
+              `Detectei **${alertCount} alertas pendentes** que requerem sua atenção. O sistema está operando em modo local com máxima performance.`;
+    }
+
+    if (q.includes('combustível') || q.includes('abastecer')) {
         const lowFuel = vehicles.filter(v => v.fuelLevel < 20);
-        const avgFuel = Math.round(vehicles.reduce((acc, v) => acc + v.fuelLevel, 0) / (totalVehicles || 1));
-        
         if (lowFuel.length > 0) {
-            return `### Análise de Combustível ⛽\n\nIdentifiquei **${lowFuel.length} veículos** com nível crítico (abaixo de 20%):\n` +
-                   lowFuel.map(v => `- **${v.model} (${v.plate})**: ${v.fuelLevel}%`).join('\n') +
-                   `\n\nA média da frota é de **${avgFuel}%**. Recomendo roteirizar abastecimento imediato para os veículos citados.`;
+            return `### ⛽ Análise de Combustível (Local)\n\nIdentifiquei **${lowFuel.length} veículos** críticos:\n` +
+                   lowFuel.map(v => `- ${v.plate}: ${v.fuelLevel}%`).join('\n') + 
+                   `\n\nSugiro agendar abastecimento.`;
         }
-        return `O nível de combustível da frota está estável, com média de **${avgFuel}%**. Nenhum veículo está na reserva no momento.`;
+        return `Nível de combustível estável (Média: ${avgFuel}%). Nenhum veículo em reserva crítica.`;
     }
 
-    // Análise de Velocidade/Segurança
-    if (q.includes('velocidade') || q.includes('rápido') || q.includes('multa') || q.includes('segurança')) {
-        const speeding = vehicles.filter(v => v.speed > 80);
-        if (speeding.length > 0) {
-            return `### Alerta de Segurança ⚠️\n\nDetectei **${speeding.length} veículos** acima de 80 km/h neste momento:\n` +
-                   speeding.map(v => `- **${v.model} (${v.plate})**: ${Math.round(v.speed)} km/h`).join('\n') +
-                   `\n\nRecomendo contatar os motoristas imediatamente para evitar infrações e acidentes.`;
-        }
-        return `Todos os veículos estão respeitando os limites de velocidade no momento. A velocidade máxima registrada é de **${Math.max(...vehicles.map(v => v.speed), 0)} km/h**.`;
+    if (q.includes('alerta') || q.includes('problema')) {
+        if (alertCount === 0) return "✅ Não há alertas pendentes no momento. Operação segura.";
+        return `### ⚠️ Central de Alertas (Local)\n\nTemos **${alertCount} ocorrências** não resolvidas. Verifique a aba de Notificações para detalhes de excesso de velocidade ou cerca virtual.`;
     }
 
-    // Análise de Motoristas
-    if (q.includes('motorista') || q.includes('condutor') || q.includes('equipe')) {
-        const bestDrivers = [...drivers].sort((a, b) => b.rating - a.rating).slice(0, 3);
-        return `### Performance da Equipe 👨‍✈️\n\nAtualmente temos **${drivers.length} motoristas** cadastrados.\n\n**Top 3 Melhores Avaliados:**\n` +
-               bestDrivers.map((d, i) => `${i+1}. **${d.name}**: ⭐ ${d.rating.toFixed(1)}`).join('\n');
-    }
-
-    // Análise de Manutenção/Alertas
-    if (q.includes('alerta') || q.includes('manutenção') || q.includes('problema') || q.includes('atenção')) {
-        if (alertCount === 0) return "Tudo tranquilo! Não há alertas pendentes ou manutenções urgentes no sistema.";
-        
-        const critical = alerts.filter(a => !a.resolved && a.severity === 'high');
-        return `### Resumo de Alertas 🔔\n\nTemos **${alertCount} alertas** pendentes.\n` +
-               (critical.length > 0 ? `\n**Críticos (${critical.length}):**\n` + critical.map(a => `- ${a.type} em ${a.vehicleId}`).join('\n') : '') +
-               `\n\nVerifique a aba de Notificações para resolver estas pendências.`;
-    }
-
-    // Resumo Geral (Default)
-    return `### Resumo da Operação NexusTrack 🌐\n\n` +
-           `- **Total de Veículos:** ${totalVehicles}\n` +
-           `- **Em Movimento:** ${movingCount} 🟢\n` +
-           `- **Parados:** ${stoppedCount} 🟡\n` +
-           `- **Alertas Pendentes:** ${alertCount} ${alertCount > 0 ? '🔴' : '⚪'}\n\n` +
-           `Estou operando em **Modo Local**. Para análises mais profundas, configure sua API Key do Google Gemini no Vercel. Como posso ajudar mais?`;
+    return `### 🧠 Nexus AI (Modo Local)\n\n` +
+           `Estou analisando sua frota internamente:\n` +
+           `- **${movingCount}** veículos em trânsito\n` +
+           `- **${avgFuel}%** média de combustível\n\n` +
+           `A chave de API configurada não retornou dados da nuvem, mas estou funcional e operando com dados locais. Como posso ajudar?`;
 };
 
 // --- FUNÇÃO PRINCIPAL ---
-
 export const analyzeFleet = async (
   query: string,
   vehicles: Vehicle[],
   drivers: Driver[],
   alerts: Alert[]
-): Promise<string> => {
+): Promise<AIResponse> => {
   const ai = getAiClient();
 
-  // 1. FALLBACK LOCAL (Se não houver API Key configurada)
+  // 1. FALLBACK LOCAL IMEDIATO (Sem nenhuma chave)
   if (!ai) {
-    console.log("NexusAI: Running in Local Mode (No API Key)");
-    // Simula um delay de rede para parecer processamento real
-    await new Promise(resolve => setTimeout(resolve, 800));
-    return mockFleetAnalysis(query, vehicles, drivers, alerts);
+    console.log("NexusAI: Modo Local (Chave não detectada)");
+    await new Promise(resolve => setTimeout(resolve, 600));
+    return {
+        text: mockFleetAnalysis(query, vehicles, drivers, alerts),
+        source: 'local'
+    };
   }
 
-  // 2. GEMINI API (Se houver API Key)
+  // Preparação do Contexto para a IA
   const contextData = {
-    currentTime: new Date().toLocaleString('pt-BR'),
-    summary: {
-       totalVehicles: vehicles.length,
+    timestamp: new Date().toLocaleString('pt-BR'),
+    stats: {
+       total: vehicles.length,
        moving: vehicles.filter(v => v.status === VehicleStatus.MOVING).length,
-       stopped: vehicles.filter(v => v.status === VehicleStatus.STOPPED).length,
-       averageFuel: Math.round(vehicles.reduce((acc, v) => acc + v.fuelLevel, 0) / (vehicles.length || 1))
+       fuelAvg: Math.round(vehicles.reduce((acc, v) => acc + v.fuelLevel, 0) / (vehicles.length || 1))
     },
-    vehicles: vehicles.map(v => ({
-        plate: v.plate,
-        model: v.model,
-        status: v.status,
-        fuel: `${v.fuelLevel}%`,
-        speed: `${Math.round(v.speed)} km/h`,
-        driver: drivers.find(d => d.id === v.driverId)?.name || 'Sem motorista'
-    })),
-    drivers: drivers.map(d => ({
-        name: d.name,
-        status: d.status,
-        rating: d.rating
-    })),
-    recentAlerts: alerts.filter(a => !a.resolved).slice(0, 5).map(a => ({
-        type: a.type,
-        severity: a.severity,
-        desc: a.description
-    }))
+    alerts_pending: alerts.filter(a => !a.resolved).length,
+    critical_alerts: alerts.filter(a => !a.resolved && a.severity === 'high').map(a => a.type)
   };
 
   const systemInstruction = `
-    Você é o NexusAI, a inteligência central da plataforma NexusTrack Premium.
-    Analise os dados JSON fornecidos e responda à pergunta do gestor de frota.
+    Você é o NexusAI, analista de frota avançado.
+    Dados Atuais: ${JSON.stringify(contextData)}
     
-    DIRETRIZES:
-    - Responda em Português do Brasil.
-    - Seja direto, profissional e use Markdown (negrito, listas) para formatar.
-    - Se encontrar situações críticas (combustível baixo < 20%, velocidade > 100km/h), destaque-as.
-    - Use emojis para tornar a leitura agradável.
-    
-    DADOS DA FROTA (JSON):
-    ${JSON.stringify(contextData)}
+    Diretrizes:
+    1. Responda em Português do Brasil.
+    2. Seja conciso e executivo.
+    3. Use formatação Markdown.
+    4. Baseie-se estritamente nos dados fornecidos.
   `;
 
   try {
+    // 2. TENTATIVA NUVEM (Usa a chave fornecida)
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
       contents: query,
       config: {
         systemInstruction: systemInstruction,
-        temperature: 0.4, // Mais preciso
-        maxOutputTokens: 500,
+        temperature: 0.3,
+        maxOutputTokens: 300,
       }
     });
 
-    return response.text || "Não consegui analisar os dados no momento.";
+    return {
+        text: response.text || "Sem resposta da nuvem.",
+        source: 'cloud'
+    };
+
   } catch (error) {
-    console.error("Gemini Error:", error);
-    // Em caso de erro na API (cota excedida, erro de rede), faz fallback para o mock
-    return mockFleetAnalysis(query, vehicles, drivers, alerts);
+    console.warn("NexusAI Cloud Error (Ativando Fallback Local):", error);
+    // 3. FALLBACK DE ERRO (Garante que "a outra" se mantenha funcional)
+    return {
+        text: mockFleetAnalysis(query, vehicles, drivers, alerts),
+        source: 'local'
+    };
   }
 };

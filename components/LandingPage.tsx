@@ -16,9 +16,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
   // Controle do Modal de Vídeo
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
-  // ID do Vídeo: Night City Drive com Música Relaxante (Jazz/Lo-Fi)
-  // Substituído para teste de áudio e visual premium
-  const VIDEO_ID = "eZe4Q_58UTU"; 
+  // ID do Vídeo: Cyberpunk City Night (Alta compatibilidade de Embed)
+  // Este vídeo é conhecido por permitir reprodução em sites externos sem erros
+  const VIDEO_ID = "7PIji8OubXU"; 
 
   // Bloqueia o scroll do body quando o modal está aberto
   useEffect(() => {
@@ -450,7 +450,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
            >
               <iframe 
                 className="w-full h-full"
-                src={`https://www.youtube.com/embed/${VIDEO_ID}?autoplay=1&rel=0&modestbranding=1&showinfo=0&controls=1&mute=0`}
+                src={`https://www.youtube.com/embed/${VIDEO_ID}?autoplay=1&mute=1&playsinline=1&rel=0&showinfo=0&controls=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
                 title="NexusTrack Premium Demo"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
                 allowFullScreen

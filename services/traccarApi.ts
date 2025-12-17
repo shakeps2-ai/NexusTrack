@@ -1,5 +1,6 @@
 
 import { Vehicle, VehicleStatus } from '../types';
+import { supabase } from './supabaseClient';
 import { MOCK_VEHICLES } from '../constants';
 
 export interface AuthResponse {
@@ -12,13 +13,11 @@ export interface AuthResponse {
   error?: string;
 }
 
-// Serviço Mock para simular backend localmente
+// Serviço Real conectado ao Supabase
 class ApiService {
-  private vehicles: Vehicle[] = [...MOCK_VEHICLES];
-
-  // Simula login verificando apenas se os campos estão preenchidos
+  
+  // Simula login (Mantido local por enquanto, idealmente migraria para Supabase Auth)
   async login(url: string, email: string, pass: string): Promise<AuthResponse> {
-    // Simulação de delay de rede
     await new Promise(r => setTimeout(r, 800));
     
     if (email === 'admin@empresa.com' && pass === '123456') {
@@ -27,7 +26,6 @@ class ApiService {
             user: { id: 1, name: 'Administrador', email: 'admin@empresa.com' } 
         };
     }
-    // Para fins de demonstração, aceita qualquer email válido se a senha não estiver vazia
     if (email.includes('@') && pass.length > 0) {
          return { 
             success: true, 
@@ -42,91 +40,158 @@ class ApiService {
       return { success: true };
   }
 
+  // Busca dispositivos do Supabase
   async getDevices(): Promise<Vehicle[]> {
-    // Retorna a lista local (em memória)
-    return Promise.resolve([...this.vehicles]);
+    try {
+      const { data, error } = await supabase.from('vehicles').select('*');
+      
+      if (error) {
+        console.error('Erro ao buscar veículos:', error);
+        return [];
+      }
+
+      // Se o banco estiver vazio, popula com dados de teste
+      if (!data || data.length === 0) {
+        await this.seedDatabase();
+        return [...MOCK_VEHICLES];
+      }
+
+      // Mapeia do formato do banco (snake_case) para o App (camelCase)
+      return data.map((v: any) => ({
+        id: v.id,
+        plate: v.plate,
+        model: v.model,
+        trackerId: v.tracker_id,
+        driverId: v.driver_id,
+        status: v.status as VehicleStatus,
+        speed: v.speed,
+        fuelLevel: v.fuel_level,
+        ignition: v.ignition,
+        isLocked: v.is_locked,
+        geofenceActive: v.geofence_active,
+        geofenceRadius: v.geofence_radius,
+        location: v.location, // JSONB {lat, lng}
+        lastUpdate: v.last_update,
+        updateInterval: v.update_interval,
+        odometer: v.odometer
+      }));
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  }
+
+  // Popula o banco na primeira execução
+  async seedDatabase() {
+     const dbVehicles = MOCK_VEHICLES.map(v => ({
+        id: v.id,
+        plate: v.plate,
+        model: v.model,
+        tracker_id: v.trackerId,
+        driver_id: v.driverId,
+        status: v.status,
+        speed: v.speed,
+        fuel_level: v.fuelLevel,
+        ignition: v.ignition,
+        is_locked: v.isLocked,
+        geofence_active: v.geofenceActive,
+        geofence_radius: v.geofenceRadius,
+        location: v.location,
+        last_update: v.lastUpdate,
+        update_interval: v.updateInterval,
+        odometer: v.odometer
+     }));
+     
+     await supabase.from('vehicles').insert(dbVehicles);
   }
 
   async addDevice(vehicle: any): Promise<boolean> {
-      await new Promise(r => setTimeout(r, 500));
-      
-      const existingIndex = this.vehicles.findIndex(v => v.id === vehicle.id);
-      
-      if (existingIndex >= 0) {
-          // Update: Mantém dados que não vieram no payload (merge seguro)
-          this.vehicles[existingIndex] = { 
-              ...this.vehicles[existingIndex], 
-              ...vehicle,
-              // Garante que se o status for PARADO, a velocidade zera
-              speed: vehicle.status === VehicleStatus.STOPPED || vehicle.status === VehicleStatus.OFFLINE ? 0 : vehicle.speed
-          };
-      } else {
-          // Insert
-          this.vehicles.push({
-              ...vehicle,
-              odometer: Number(vehicle.odometer) || 0,
-              speed: vehicle.status === VehicleStatus.MOVING ? (vehicle.speed || 30) : 0,
-              location: vehicle.location || { lat: -23.5505, lng: -46.6333 }
-          });
-      }
-      return true;
+      // Prepara objeto para o formato do banco
+      const dbVehicle = {
+        id: vehicle.id,
+        plate: vehicle.plate,
+        model: vehicle.model,
+        tracker_id: vehicle.trackerId,
+        driver_id: vehicle.driverId,
+        status: vehicle.status,
+        speed: vehicle.speed,
+        fuel_level: vehicle.fuelLevel,
+        ignition: vehicle.ignition,
+        is_locked: vehicle.isLocked,
+        geofence_active: vehicle.geofenceActive,
+        geofence_radius: vehicle.geofenceRadius,
+        location: vehicle.location,
+        last_update: vehicle.lastUpdate,
+        update_interval: vehicle.updateInterval,
+        odometer: vehicle.odometer
+      };
+
+      const { error } = await supabase.from('vehicles').upsert(dbVehicle);
+      return !error;
   }
   
   async deleteDevice(id: string): Promise<boolean> {
-      this.vehicles = this.vehicles.filter(v => v.id !== id);
-      return true;
+      const { error } = await supabase.from('vehicles').delete().eq('id', id);
+      return !error;
   }
 
   async toggleLock(id: string): Promise<boolean> {
-      const v = this.vehicles.find(v => v.id === id);
-      if (v) {
-          v.isLocked = !v.isLocked;
-          if (v.isLocked) {
-              v.status = VehicleStatus.STOPPED;
-              v.speed = 0;
-              v.ignition = false;
+      // Primeiro busca o estado atual
+      const { data: vehicle } = await supabase.from('vehicles').select('is_locked').eq('id', id).single();
+      
+      if (vehicle) {
+          const newLockState = !vehicle.is_locked;
+          const updates: any = { is_locked: newLockState };
+          
+          if (newLockState) {
+              updates.status = VehicleStatus.STOPPED;
+              updates.speed = 0;
+              updates.ignition = false;
           }
+
+          await supabase.from('vehicles').update(updates).eq('id', id);
           return true;
       }
       return false;
   }
 
-  // Simulação de movimento aleatório para parecer "vivo"
-  simulateMovement() {
-    this.vehicles = this.vehicles.map(v => {
-        if (v.status === VehicleStatus.MOVING && !v.isLocked) {
-            // Nova velocidade com variação suave, arredondada para inteiro
-            let variation = (Math.random() * 6 - 3); // Varia entre -3 e +3 km/h
-            let newSpeed = v.speed + variation;
+  // Simulação: Calcula novas posições no frontend e SALVA no banco
+  // Isso permite que múltiplos clientes vendo o painel vejam o movimento em tempo real
+  async simulateMovement() {
+    const { data: vehicles } = await supabase.from('vehicles').select('*').eq('is_locked', false);
+    
+    if (!vehicles) return;
+
+    const updates = vehicles
+        .filter((v: any) => v.status === 'Em Movimento') // Filtra apenas status string exata ou enum
+        .map((v: any) => {
+            // Lógica de movimento
+            let variation = (Math.random() * 6 - 3); 
+            let newSpeed = Math.max(0, Math.min(160, Math.round(v.speed + variation)));
             
-            // Limites de velocidade (0 a 160 km/h)
-            newSpeed = Math.max(0, Math.min(160, Math.round(newSpeed)));
-            
-            // Se velocidade for muito baixa mas status for movendo, mantém um mínimo ou para
             if (newSpeed < 5) newSpeed = 10;
 
-            // Calcular distância percorrida no intervalo (assumindo ~2s de intervalo de atualização)
-            // Distância (km) = Velocidade (km/h) * (Tempo (s) / 3600)
             const distanceTraveledKm = (newSpeed * 2) / 3600;
+            const newOdometer = (v.odometer || 0) + distanceTraveledKm;
+
+            const newLocation = {
+                lat: (v.location?.lat || -23.55) + (Math.random() * 0.001 - 0.0005),
+                lng: (v.location?.lng || -46.63) + (Math.random() * 0.001 - 0.0005)
+            };
 
             return {
-                ...v,
-                speed: Math.round(newSpeed), // Força inteiro
-                odometer: v.odometer + distanceTraveledKm, // Acumula odômetro
-                location: {
-                    lat: v.location.lat + (Math.random() * 0.001 - 0.0005),
-                    lng: v.location.lng + (Math.random() * 0.001 - 0.0005)
-                }
+                id: v.id,
+                speed: newSpeed,
+                odometer: newOdometer,
+                location: newLocation,
+                last_update: 'Agora'
             };
-        } else {
-            // Se não está movendo, garante velocidade 0
-            return {
-                ...v,
-                speed: 0
-            };
-        }
-        return v;
-    });
+        });
+
+    if (updates.length > 0) {
+        // Envia atualizações em lote (Bulk Upsert)
+        await supabase.from('vehicles').upsert(updates);
+    }
   }
 }
 
