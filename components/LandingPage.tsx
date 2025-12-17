@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Shield, Smartphone, Cpu, Map, CheckCircle, ArrowRight, 
-  Globe, Zap, Users, ChevronRight, Menu, X, Play
+  Globe, Zap, Users, ChevronRight, Menu, X, Play, FileText, Mail, Phone, Server
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -11,6 +11,7 @@ interface LandingPageProps {
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [activeInfo, setActiveInfo] = useState<{ title: string; content: React.ReactNode } | null>(null);
 
   // Função auxiliar para rolar suavemente
   const scrollToSection = (id: string) => {
@@ -43,6 +44,236 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       desc: "App nativo para iOS e Android. Gerencie sua operação de qualquer lugar do mundo."
     }
   ];
+
+  // Dados do Rodapé
+  const footerLinks = {
+    produto: [
+      { 
+        label: "Funcionalidades", 
+        title: "Funcionalidades da Plataforma",
+        content: (
+          <div className="space-y-4">
+            <p className="text-slate-300">Nossa plataforma oferece um conjunto completo de ferramentas para gestão:</p>
+            <ul className="space-y-2">
+              <li className="flex gap-2 items-center text-slate-400"><CheckCircle className="w-4 h-4 text-blue-500" /> Rastreamento GPS em tempo real (atualização 5s)</li>
+              <li className="flex gap-2 items-center text-slate-400"><CheckCircle className="w-4 h-4 text-blue-500" /> Histórico de rotas de até 90 dias</li>
+              <li className="flex gap-2 items-center text-slate-400"><CheckCircle className="w-4 h-4 text-blue-500" /> Bloqueio e desbloqueio remoto</li>
+              <li className="flex gap-2 items-center text-slate-400"><CheckCircle className="w-4 h-4 text-blue-500" /> Cercas virtuais ilimitadas</li>
+              <li className="flex gap-2 items-center text-slate-400"><CheckCircle className="w-4 h-4 text-blue-500" /> Relatórios de telemetria avançada</li>
+            </ul>
+          </div>
+        )
+      },
+      { 
+        label: "Hardware", 
+        title: "Compatibilidade de Hardware",
+        content: (
+          <div className="space-y-4">
+            <p className="text-slate-300">O NexusTrack é agnóstico a hardware, suportando mais de 2.000 modelos de rastreadores.</p>
+            <div className="grid grid-cols-2 gap-4">
+               <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                  <h4 className="font-bold text-white mb-1">Rastreadores Fixos</h4>
+                  <p className="text-xs text-slate-500">Teltonika, Suntech, Ruptela, CalAmp.</p>
+               </div>
+               <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                  <h4 className="font-bold text-white mb-1">OBD-II</h4>
+                  <p className="text-xs text-slate-500">Plug & Play para veículos leves.</p>
+               </div>
+               <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                  <h4 className="font-bold text-white mb-1">Mobile</h4>
+                  <p className="text-xs text-slate-500">App Rastreador (Android/iOS).</p>
+               </div>
+               <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+                  <h4 className="font-bold text-white mb-1">Satélite</h4>
+                  <p className="text-xs text-slate-500">Spot, Globalstar (Áreas remotas).</p>
+               </div>
+            </div>
+          </div>
+        )
+      },
+      { 
+        label: "Integrações", 
+        title: "API & Integrações",
+        content: (
+          <div className="space-y-4">
+             <p className="text-slate-300">Conecte sua operação ao seu ERP ou sistema de logística.</p>
+             <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
+                    <span className="text-white font-mono text-sm">REST API</span>
+                    <span className="text-green-400 text-xs font-bold uppercase">Disponível</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
+                    <span className="text-white font-mono text-sm">Webhooks</span>
+                    <span className="text-green-400 text-xs font-bold uppercase">Disponível</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
+                    <span className="text-white font-mono text-sm">Exportação CSV/JSON</span>
+                    <span className="text-green-400 text-xs font-bold uppercase">Disponível</span>
+                </div>
+             </div>
+          </div>
+        )
+      },
+      { 
+        label: "Preços", 
+        title: "Planos e Preços",
+        content: (
+          <div className="space-y-4">
+             <div className="p-4 rounded-xl border border-slate-700 bg-slate-900/50">
+                <h4 className="text-lg font-bold text-white">Start</h4>
+                <p className="text-2xl font-bold text-blue-400 my-2">R$ 29,90<span className="text-sm text-slate-500 font-normal">/mês</span></p>
+                <p className="text-xs text-slate-400">Por veículo. Rastreamento básico e bloqueio.</p>
+             </div>
+             <div className="p-4 rounded-xl border border-blue-500 bg-blue-900/10 relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold">POPULAR</div>
+                <h4 className="text-lg font-bold text-white">Pro AI</h4>
+                <p className="text-2xl font-bold text-blue-400 my-2">R$ 59,90<span className="text-sm text-slate-500 font-normal">/mês</span></p>
+                <p className="text-xs text-slate-400">Por veículo. Telemetria completa e Inteligência Artificial.</p>
+             </div>
+             <div className="p-4 rounded-xl border border-slate-700 bg-slate-900/50">
+                <h4 className="text-lg font-bold text-white">Enterprise</h4>
+                <p className="text-lg font-bold text-slate-300 my-2">Sob Consulta</p>
+                <p className="text-xs text-slate-400">Frota acima de 50 veículos. API dedicada.</p>
+             </div>
+          </div>
+        )
+      }
+    ],
+    empresa: [
+      { 
+        label: "Sobre Nós", 
+        title: "Sobre a NexusTrack",
+        content: (
+          <div className="space-y-4">
+             <p className="text-slate-300 leading-relaxed">
+               Fundada em 2021, a NexusTrack nasceu com a missão de democratizar a tecnologia de telemetria avançada. O que antes era acessível apenas para grandes transportadoras, hoje entregamos para frotas de qualquer tamanho.
+             </p>
+             <p className="text-slate-300 leading-relaxed">
+               Nossa equipe é composta por engenheiros de software, especialistas em hardware e analistas de logística apaixonados por eficiência.
+             </p>
+             <div className="flex gap-4 pt-2">
+                 <div className="text-center">
+                    <p className="text-2xl font-bold text-white">3+</p>
+                    <p className="text-xs text-slate-500">Anos de Mercado</p>
+                 </div>
+                 <div className="text-center">
+                    <p className="text-2xl font-bold text-white">12</p>
+                    <p className="text-xs text-slate-500">Países Atendidos</p>
+                 </div>
+             </div>
+          </div>
+        )
+      },
+      { 
+        label: "Carreiras", 
+        title: "Trabalhe Conosco",
+        content: (
+          <div className="space-y-4">
+             <p className="text-slate-300">Estamos sempre em busca de talentos para construir o futuro da logística.</p>
+             <h4 className="font-bold text-white mt-4 mb-2">Vagas Abertas:</h4>
+             <ul className="space-y-2">
+                <li className="p-3 bg-slate-900 rounded-lg flex justify-between items-center cursor-pointer hover:bg-slate-800 transition-colors">
+                   <div>
+                      <p className="text-sm font-bold text-white">Senior Frontend Dev (React)</p>
+                      <p className="text-xs text-slate-500">Remoto • Tech</p>
+                   </div>
+                   <ChevronRight className="w-4 h-4 text-slate-500" />
+                </li>
+                <li className="p-3 bg-slate-900 rounded-lg flex justify-between items-center cursor-pointer hover:bg-slate-800 transition-colors">
+                   <div>
+                      <p className="text-sm font-bold text-white">Analista de Suporte N2</p>
+                      <p className="text-xs text-slate-500">Híbrido • SP</p>
+                   </div>
+                   <ChevronRight className="w-4 h-4 text-slate-500" />
+                </li>
+             </ul>
+             <p className="text-xs text-slate-500 mt-2">Envie seu CV para talentos@nexustrack.com</p>
+          </div>
+        )
+      },
+      { 
+        label: "Contato", 
+        title: "Canais de Atendimento",
+        content: (
+          <div className="space-y-5">
+             <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-600/10 rounded-lg text-blue-500"><Mail className="w-5 h-5" /></div>
+                <div>
+                   <p className="text-sm font-bold text-white">Email Comercial</p>
+                   <p className="text-slate-400 text-sm">vendas@nexustrack.com</p>
+                </div>
+             </div>
+             <div className="flex items-center gap-4">
+                <div className="p-3 bg-green-600/10 rounded-lg text-green-500"><Phone className="w-5 h-5" /></div>
+                <div>
+                   <p className="text-sm font-bold text-white">Suporte Técnico</p>
+                   <p className="text-slate-400 text-sm">0800 123 4567</p>
+                </div>
+             </div>
+             <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-600/10 rounded-lg text-purple-500"><Map className="w-5 h-5" /></div>
+                <div>
+                   <p className="text-sm font-bold text-white">Escritório Central</p>
+                   <p className="text-slate-400 text-sm">Av. Paulista, 1000 - Bela Vista<br/>São Paulo - SP</p>
+                </div>
+             </div>
+          </div>
+        )
+      }
+    ],
+    legal: [
+      { 
+        label: "Privacidade", 
+        title: "Política de Privacidade",
+        content: (
+          <div className="space-y-4 text-sm text-slate-300 leading-relaxed max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+             <p>A sua privacidade é nossa prioridade. Esta política descreve como coletamos, usamos e protegemos seus dados.</p>
+             <h5 className="text-white font-bold">1. Coleta de Dados</h5>
+             <p>Coletamos dados de geolocalização, telemetria do veículo e informações de cadastro para fornecer o serviço de rastreamento.</p>
+             <h5 className="text-white font-bold">2. Uso das Informações</h5>
+             <p>Utilizamos os dados para gerar relatórios, alertas de segurança e otimização de rotas. Não vendemos seus dados para terceiros.</p>
+             <h5 className="text-white font-bold">3. Segurança</h5>
+             <p>Todos os dados são transmitidos via SSL/TLS e armazenados em servidores criptografados (AES-256).</p>
+          </div>
+        )
+      },
+      { 
+        label: "Termos de Uso", 
+        title: "Termos de Serviço",
+        content: (
+          <div className="space-y-4 text-sm text-slate-300">
+             <p>Ao utilizar a plataforma NexusTrack, você concorda com os seguintes termos:</p>
+             <ul className="list-disc pl-4 space-y-2">
+                <li>O serviço é fornecido "como está", com garantia de uptime de 99.9% para clientes Enterprise.</li>
+                <li>O usuário é responsável pela legalidade do rastreamento dos veículos cadastrados.</li>
+                <li>O não pagamento da mensalidade pode acarretar na suspensão do serviço após 5 dias úteis.</li>
+             </ul>
+          </div>
+        )
+      },
+      { 
+        label: "LGPD", 
+        title: "Conformidade LGPD",
+        content: (
+          <div className="space-y-4">
+             <div className="p-4 bg-green-900/10 border border-green-500/20 rounded-xl flex gap-3 items-start">
+                 <Shield className="w-6 h-6 text-green-500 shrink-0" />
+                 <div>
+                    <h4 className="font-bold text-white text-sm">Compliance Total</h4>
+                    <p className="text-xs text-slate-400 mt-1">Nossa plataforma está 100% adequada à Lei Geral de Proteção de Dados (Lei nº 13.709/2018).</p>
+                 </div>
+             </div>
+             <p className="text-sm text-slate-300">
+                Você tem o direito de solicitar a exclusão, portabilidade ou anonimização dos seus dados a qualquer momento através do nosso portal de privacidade (DPO).
+             </p>
+             <button className="w-full py-2 bg-slate-800 rounded-lg text-sm text-white hover:bg-slate-700 transition-colors">
+                Falar com o DPO
+             </button>
+          </div>
+        )
+      }
+    ]
+  };
 
   return (
     // FIX: h-screen e overflow-y-auto adicionados para permitir rolagem independente do body:hidden
@@ -357,29 +588,48 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             <div>
               <h4 className="font-bold text-white mb-4">Produto</h4>
               <ul className="space-y-2 text-sm text-slate-400">
-                <li><a href="#" className="hover:text-blue-400">Funcionalidades</a></li>
-                <li><a href="#" className="hover:text-blue-400">Hardware</a></li>
-                <li><a href="#" className="hover:text-blue-400">Integrações</a></li>
-                <li><a href="#" className="hover:text-blue-400">Preços</a></li>
+                 {footerLinks.produto.map((item, i) => (
+                    <li key={i}>
+                       <button 
+                         onClick={() => setActiveInfo(item)}
+                         className="hover:text-blue-400 transition-colors text-left"
+                       >
+                         {item.label}
+                       </button>
+                    </li>
+                 ))}
               </ul>
             </div>
 
             <div>
               <h4 className="font-bold text-white mb-4">Empresa</h4>
               <ul className="space-y-2 text-sm text-slate-400">
-                <li><a href="#" className="hover:text-blue-400">Sobre Nós</a></li>
-                <li><a href="#" className="hover:text-blue-400">Carreiras</a></li>
-                <li><a href="#" className="hover:text-blue-400">Blog</a></li>
-                <li><a href="#" className="hover:text-blue-400">Contato</a></li>
+                 {footerLinks.empresa.map((item, i) => (
+                    <li key={i}>
+                       <button 
+                         onClick={() => setActiveInfo(item)}
+                         className="hover:text-blue-400 transition-colors text-left"
+                       >
+                         {item.label}
+                       </button>
+                    </li>
+                 ))}
               </ul>
             </div>
 
             <div>
               <h4 className="font-bold text-white mb-4">Legal</h4>
               <ul className="space-y-2 text-sm text-slate-400">
-                <li><a href="#" className="hover:text-blue-400">Privacidade</a></li>
-                <li><a href="#" className="hover:text-blue-400">Termos de Uso</a></li>
-                <li><a href="#" className="hover:text-blue-400">LGPD</a></li>
+                 {footerLinks.legal.map((item, i) => (
+                    <li key={i}>
+                       <button 
+                         onClick={() => setActiveInfo(item)}
+                         className="hover:text-blue-400 transition-colors text-left"
+                       >
+                         {item.label}
+                       </button>
+                    </li>
+                 ))}
               </ul>
             </div>
           </div>
@@ -387,13 +637,46 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-slate-600 text-sm">© 2024 NexusTrack. Todos os direitos reservados.</p>
             <div className="flex gap-4">
-               {/* Social Icons Placeholders */}
                <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-slate-400 hover:text-white hover:bg-blue-600 transition-colors cursor-pointer"><Users className="w-4 h-4"/></div>
                <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-slate-400 hover:text-white hover:bg-blue-600 transition-colors cursor-pointer"><Globe className="w-4 h-4"/></div>
             </div>
           </div>
         </div>
       </footer>
+
+      {/* --- INFO MODAL --- */}
+      {activeInfo && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setActiveInfo(null)}>
+           <div 
+             className="bg-slate-950 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative"
+             onClick={(e) => e.stopPropagation()}
+           >
+              <div className="flex justify-between items-center p-5 border-b border-slate-800 bg-slate-900/50">
+                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-blue-500" />
+                    {activeInfo.title}
+                 </h3>
+                 <button 
+                   onClick={() => setActiveInfo(null)}
+                   className="text-slate-500 hover:text-white transition-colors"
+                 >
+                   <X className="w-6 h-6" />
+                 </button>
+              </div>
+              <div className="p-6">
+                 {activeInfo.content}
+              </div>
+              <div className="p-4 border-t border-slate-800 bg-slate-900/30 flex justify-end">
+                 <button 
+                   onClick={() => setActiveInfo(null)}
+                   className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-colors"
+                 >
+                   Fechar
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
