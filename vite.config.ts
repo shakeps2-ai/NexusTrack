@@ -1,3 +1,4 @@
+
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -9,7 +10,9 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     // Define variáveis globais para serem substituídas durante o build
     define: {
-      'process.env.API_KEY': JSON.stringify(env.API_KEY)
+      'process.env.API_KEY': JSON.stringify(env.API_KEY),
+      'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
+      'process.env.SUPABASE_KEY': JSON.stringify(env.SUPABASE_KEY)
     },
     server: {
       port: 3000,
@@ -22,7 +25,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            vendor: ['react', 'react-dom', 'leaflet', 'recharts', 'lucide-react'],
+            vendor: ['react', 'react-dom', 'leaflet', 'recharts', 'lucide-react', '@supabase/supabase-js'],
           },
         },
       },
