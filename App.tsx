@@ -13,7 +13,7 @@ import { NotificationHistory } from './components/NotificationHistory';
 import { LandingPage } from './components/LandingPage';
 import { ViewState, Vehicle, VehicleStatus, Alert, AlertType } from './types';
 import { MOCK_DRIVERS, MOCK_ALERTS } from './constants';
-import { Bell, User, Server, LogIn, Loader2, LogOut, UserPlus, ArrowLeft } from 'lucide-react';
+import { Bell, User, Server, LogIn, Loader2, LogOut, UserPlus, ArrowLeft, ShieldCheck, CheckCircle } from 'lucide-react';
 import { traccarApi } from './services/traccarApi';
 
 const App: React.FC = () => {
@@ -161,9 +161,10 @@ const App: React.FC = () => {
       setAuthError(null);
 
       try {
+        // Fix: Removed first empty parameter from register and login calls
         const res = isRegistering 
-            ? await traccarApi.register('', loginForm.name, loginForm.email, loginForm.password)
-            : await traccarApi.login('', loginForm.email, loginForm.password);
+            ? await traccarApi.register(loginForm.name, loginForm.email, loginForm.password)
+            : await traccarApi.login(loginForm.email, loginForm.password);
 
         if (res.success) {
             if (isRegistering) {
@@ -180,6 +181,37 @@ const App: React.FC = () => {
         }
       } catch (err) {
           setAuthError("Erro de conexão.");
+      } finally {
+          setIsConnecting(false);
+      }
+  };
+
+  const handleCreateAdmin = async () => {
+      setIsConnecting(true);
+      setAuthError(null);
+      try {
+          const res = await traccarApi.createDefaultAdmin();
+          
+          // Preenche o formulário automaticamente para facilitar
+          setLoginForm({
+              name: 'Administrador Global',
+              email: 'admin@nexustrack.com',
+              password: 'admin123'
+          });
+
+          if (res.success) {
+              if (res.user) setUserProfile(prev => ({ ...prev, email: res.user!.email, name: res.user!.name }));
+              // Pequeno delay para mostrar que funcionou antes de entrar
+              setAuthError('Admin configurado! Entrando...');
+              setTimeout(() => {
+                  setIsAuthenticated(true);
+                  setShowLanding(false);
+              }, 1000);
+          } else {
+              setAuthError(res.error || "Erro ao criar admin.");
+          }
+      } catch (e) {
+          setAuthError("Erro de conexão ao criar admin.");
       } finally {
           setIsConnecting(false);
       }
@@ -266,6 +298,8 @@ const App: React.FC = () => {
     setVehicles([]);
     setShowLogoutConfirm(false);
     setShowLanding(true);
+    // Limpa form ao sair
+    setLoginForm({ name: '', email: '', password: '' });
   };
 
   const handleQuickAction = (action: string) => {
@@ -307,7 +341,10 @@ const App: React.FC = () => {
                       <h1 className="text-2xl font-bold text-white">NexusTrack <span className="text-blue-500">Premium</span></h1>
                       <p className="text-slate-400 text-sm mt-2">{isRegistering ? 'Crie sua conta empresarial' : 'Plataforma Inteligente de Gestão'}</p>
                   </div>
-                  {authError && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm text-center relative z-10">{authError}</div>}
+                  {authError && <div className={`mb-4 p-3 rounded-lg text-sm text-center relative z-10 flex items-center justify-center gap-2 ${authError.includes('configurado') ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+                      {authError.includes('configurado') && <CheckCircle className="w-4 h-4" />}
+                      {authError}
+                  </div>}
                   <form onSubmit={handleAuth} className="space-y-4 relative z-10">
                       {isRegistering && (
                           <div className="space-y-1 animate-in slide-in-from-left-2">
@@ -317,18 +354,28 @@ const App: React.FC = () => {
                       )}
                       <div className="space-y-1">
                           <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
-                          <input type="text" required placeholder="admin@empresa.com" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
+                          <input type="text" required placeholder="admin@nexustrack.com" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
                       </div>
                       <div className="space-y-1">
                           <label className="text-xs font-bold text-slate-500 uppercase">Senha</label>
                           <input type="password" required placeholder="••••••••" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" />
                       </div>
+                      
+                      {/* BOTAO PRINCIPAL DE LOGIN */}
                       <button type="submit" disabled={isConnecting} className={`w-full font-bold py-3.5 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 mt-4 ${isRegistering ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}>
                           {isConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : isRegistering ? <UserPlus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
                           {isConnecting ? 'Acessando...' : (isRegistering ? 'Criar Conta' : 'Entrar na Plataforma')}
                       </button>
-                      <div className="text-center pt-2">
+
+                      <div className="text-center pt-2 space-y-3">
                           <button type="button" onClick={() => { setIsRegistering(!isRegistering); setAuthError(null); }} className="text-sm text-slate-500 hover:text-blue-400 transition-colors">{isRegistering ? "Já tem uma conta? Faça Login" : "Não tem conta? Crie uma grátis"}</button>
+                          
+                          {/* BOTAO PARA CRIAR ADMIN PADRAO (SETUP) */}
+                          {!isRegistering && (
+                              <button type="button" onClick={handleCreateAdmin} className="w-full text-xs font-bold uppercase tracking-wider text-slate-600 hover:text-blue-500 transition-colors flex items-center justify-center gap-1 py-2 border border-dashed border-slate-800 hover:border-blue-500/50 rounded-lg">
+                                  <ShieldCheck className="w-3 h-3" /> Configurar Admin Padrão
+                              </button>
+                          )}
                       </div>
                   </form>
               </div>
@@ -383,7 +430,7 @@ const App: React.FC = () => {
       <UserProfile isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} onLogout={() => setShowLogoutConfirm(true)} currentUser={userProfile} onUpdateProfile={(d) => setUserProfile(p => ({ ...p, ...d }))} />
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-6 text-center">
+            <div className="bg-slate-900 border border-slate-800 w-full max-sm rounded-2xl shadow-2xl p-6 text-center">
                 <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4 mx-auto"><LogOut className="w-8 h-8 text-red-500" /></div>
                 <h3 className="text-xl font-bold text-white mb-2">Encerrar Sessão?</h3>
                 <div className="flex gap-3 w-full mt-6">

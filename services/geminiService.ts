@@ -3,11 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 import { Vehicle, Driver, Alert, VehicleStatus } from '../types';
 
 // --- CONFIGURAÇÃO ---
-const MODEL_NAME = 'gemini-2.5-flash';
-
-// Chave fornecida pelo usuário (Prioridade secundária após variáveis de ambiente)
-// Nota: Chaves 'vck_' geralmente são da Vercel. Se falhar com o Google, o fallback local assume.
-const PROVIDED_KEY = 'vck_5epCCSScPepll9AMdh81cRhIMj4mOOy9BwUClSjfpnxlt2jRQn1xaQbG';
+// Fix: Use recommended model for basic text analysis tasks
+const MODEL_NAME = 'gemini-3-flash-preview';
 
 // Interface de Resposta Híbrida
 export interface AIResponse {
@@ -16,9 +13,8 @@ export interface AIResponse {
 }
 
 const getAiClient = () => {
-  // 1. Tenta var de ambiente segura
-  // 2. Tenta a chave fornecida manualmente
-  const apiKey = process.env.API_KEY || PROVIDED_KEY;
+  // Fix: The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+  const apiKey = process.env.API_KEY;
   
   if (!apiKey || apiKey === 'undefined' || apiKey === '') return null;
   return new GoogleGenAI({ apiKey });
@@ -107,7 +103,7 @@ export const analyzeFleet = async (
   `;
 
   try {
-    // 2. TENTATIVA NUVEM (Usa a chave fornecida)
+    // 2. TENTATIVA NUVEM
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
       contents: query,
@@ -118,6 +114,7 @@ export const analyzeFleet = async (
       }
     });
 
+    // Fix: Access response.text as a property, not a method, as per SDK guidelines.
     return {
         text: response.text || "Sem resposta da nuvem.",
         source: 'cloud'

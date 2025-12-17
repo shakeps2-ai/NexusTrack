@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       assetsDir: 'assets',
       sourcemap: false,
+      chunkSizeWarningLimit: 1600, // Ajuste para 1600kb para suprimir avisos
       // Otimizações para reduzir tamanho do bundle
       rollupOptions: {
         output: {
